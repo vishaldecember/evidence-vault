@@ -1,23 +1,34 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
-class AppTextStyles {
+abstract final class AppTextStyles {
   static const appTitle = TextStyle(
     fontSize: 30,
     fontWeight: FontWeight.bold,
     color: AppColors.navy,
+    letterSpacing: -0.5,
+  );
+
+  static const pageTitle = TextStyle(
+    fontSize: 32,
+    fontWeight: FontWeight.w700,
+    color: AppColors.navy,
+    letterSpacing: -0.8,
+    height: 1.2,
   );
 
   static const screenTitle = TextStyle(
     fontSize: 24,
     fontWeight: FontWeight.bold,
     color: AppColors.navy,
+    letterSpacing: -0.4,
   );
 
   static const heading = TextStyle(
     fontSize: 20,
     fontWeight: FontWeight.w600,
     color: AppColors.navy,
+    letterSpacing: -0.3,
   );
 
   static const body = TextStyle(
@@ -26,10 +37,17 @@ class AppTextStyles {
     color: AppColors.textSecondary,
   );
 
+  static const bodySmall = TextStyle(
+    fontSize: 15,
+    height: 1.5,
+    color: AppColors.textMuted,
+  );
+
   static const button = TextStyle(
     fontSize: 17,
     fontWeight: FontWeight.w600,
-    color: Colors.white,
+    color: AppColors.onPrimary,
+    letterSpacing: -0.2,
   );
 
   static const label = TextStyle(
@@ -40,6 +58,37 @@ class AppTextStyles {
 
   static const caption = TextStyle(
     fontSize: 13,
+    color: AppColors.textSecondary,
+    height: 1.4,
+  );
+
+  static const link = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w600,
+    color: AppColors.primary,
+  );
+
+  static const dividerLabel = TextStyle(
+    fontSize: 13,
+    fontWeight: FontWeight.w500,
+    color: AppColors.textMuted,
+    letterSpacing: 0.2,
+  );
+
+  static const socialButton = TextStyle(
+    fontSize: 15,
+    fontWeight: FontWeight.w500,
+    color: AppColors.textPrimary,
+  );
+
+  static const signInPrompt = TextStyle(
+    fontSize: 15,
+    color: AppColors.textSecondary,
+  );
+
+  static const strengthLabel = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w500,
     color: AppColors.textSecondary,
   );
 }
