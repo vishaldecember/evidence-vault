@@ -87,14 +87,8 @@ class _SocialButton extends StatelessWidget {
       child: SizedBox(
         width: double.infinity,
         height: AppSpacing.socialButtonHeight,
-        child: OutlinedButton.icon(
+        child: OutlinedButton(
           onPressed: onTap,
-          icon: Image.asset(
-            iconPath,
-            width: AppSpacing.lg + 2,
-            height: AppSpacing.lg + 2,
-          ),
-          label: Text(label, style: AppTextStyles.socialButton),
           style: OutlinedButton.styleFrom(
             backgroundColor: AppColors.background,
             side: const BorderSide(color: AppColors.divider),
@@ -102,6 +96,25 @@ class _SocialButton extends StatelessWidget {
               borderRadius:
                   BorderRadius.circular(AppSpacing.md + AppSpacing.xxs),
             ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Image.asset(
+                iconPath,
+                width: AppSpacing.lg + 2,
+                height: AppSpacing.lg + 2,
+              ),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                  style: AppTextStyles.socialButton,
+                ),
+              ),
+            ],
           ),
         ),
       ),

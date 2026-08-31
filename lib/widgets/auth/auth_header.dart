@@ -7,12 +7,17 @@ class AuthHeader extends StatefulWidget {
   final String title;
   final String description;
   final bool showBrandName;
+  final bool compact;
+  /// Further reduced logo + spacing for create-account onboarding.
+  final bool onboarding;
 
   const AuthHeader({
     super.key,
     required this.title,
     required this.description,
     this.showBrandName = true,
+    this.compact = false,
+    this.onboarding = false,
   });
 
   @override
@@ -54,6 +59,20 @@ class _AuthHeaderState extends State<AuthHeader>
 
   @override
   Widget build(BuildContext context) {
+    final logoSize = widget.onboarding
+        ? AppSpacing.logoSizeOnboarding
+        : widget.compact
+            ? AppSpacing.logoSizeCompact
+            : AppSpacing.logoSizeLarge;
+    final chromePadding = widget.onboarding
+        ? AppSpacing.xs
+        : widget.compact
+            ? AppSpacing.sm
+            : AppSpacing.xl;
+    final titleStyle = widget.onboarding
+        ? AppTextStyles.pageTitle.copyWith(fontSize: 26)
+        : AppTextStyles.pageTitle;
+
     return FadeTransition(
       opacity: _fadeAnimation,
       child: SlideTransition(
@@ -61,23 +80,28 @@ class _AuthHeaderState extends State<AuthHeader>
         child: Column(
           children: [
             Container(
-              width: AppSpacing.logoSizeLarge + AppSpacing.xl,
-              height: AppSpacing.logoSizeLarge + AppSpacing.xl,
-              padding: const EdgeInsets.all(AppSpacing.sm),
+              width: logoSize + chromePadding,
+              height: logoSize + chromePadding,
+              padding: EdgeInsets.all(
+                widget.onboarding || widget.compact
+                    ? AppSpacing.xxs + 2
+                    : AppSpacing.sm,
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surfaceMuted,
                 borderRadius: BorderRadius.circular(AppSpacing.xxl),
-                boxShadow: const [
+                boxShadow: [
                   BoxShadow(
                     color: AppColors.shadow,
-                    blurRadius: 24,
-                    offset: Offset(0, 8),
+                    blurRadius: widget.onboarding ? 16 : 24,
+                    offset: Offset(0, widget.onboarding ? 4 : 8),
                   ),
                 ],
               ),
               child: Image.asset(
-                'assets/images/evidence_vault_logo.png',
+                'assets/images/branding/logo_mark.png',
                 fit: BoxFit.contain,
+                excludeFromSemantics: true,
               ),
             ),
             if (widget.showBrandName) ...[
@@ -87,17 +111,33 @@ class _AuthHeaderState extends State<AuthHeader>
                 style: AppTextStyles.appTitle.copyWith(fontSize: 22),
               ),
             ],
-            const SizedBox(height: AppSpacing.xl),
+            SizedBox(
+              height: widget.onboarding
+                  ? AppSpacing.sm
+                  : widget.compact
+                      ? AppSpacing.md
+                      : AppSpacing.xl,
+            ),
             Text(
               widget.title,
               textAlign: TextAlign.center,
-              style: AppTextStyles.pageTitle,
+              style: titleStyle,
             ),
-            const SizedBox(height: AppSpacing.sm),
+            SizedBox(
+              height: widget.onboarding || widget.compact
+                  ? AppSpacing.xs
+                  : AppSpacing.sm,
+            ),
             Text(
               widget.description,
               textAlign: TextAlign.center,
-              style: AppTextStyles.bodySmall,
+              maxLines: widget.onboarding || widget.compact ? 2 : null,
+              overflow: widget.onboarding || widget.compact
+                  ? TextOverflow.ellipsis
+                  : null,
+              style: AppTextStyles.bodySmall.copyWith(
+                height: widget.onboarding ? 1.35 : null,
+              ),
             ),
           ],
         ),

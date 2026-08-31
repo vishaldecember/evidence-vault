@@ -13,6 +13,10 @@ class EVTextField extends StatelessWidget {
   final ValueChanged<String>? onChanged;
   final FormFieldSetter<String>? onSaved;
   final AutovalidateMode? autovalidateMode;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onFieldSubmitted;
+  final bool enabled;
+  final bool compact;
 
   const EVTextField({
     super.key,
@@ -25,31 +29,43 @@ class EVTextField extends StatelessWidget {
     this.onChanged,
     this.onSaved,
     this.autovalidateMode,
+    this.focusNode,
+    this.onFieldSubmitted,
+    this.enabled = true,
+    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    final verticalPadding = compact
+        ? AppSpacing.fieldPaddingVerticalCompact
+        : AppSpacing.lg + 2;
+
     return TextFormField(
+      enabled: enabled,
+      focusNode: focusNode,
       keyboardType: keyboardType,
       textInputAction: textInputAction,
       validator: validator,
       onChanged: onChanged,
       onSaved: onSaved,
+      onFieldSubmitted: onFieldSubmitted,
       autovalidateMode: autovalidateMode,
       style: AppTextStyles.label,
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         hintStyle: AppTextStyles.caption,
+        isDense: compact,
         prefixIcon: Icon(
           icon,
           color: AppColors.primary,
         ),
         filled: true,
         fillColor: AppColors.card,
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
-          vertical: AppSpacing.lg + 2,
+          vertical: verticalPadding,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.fieldRadius),

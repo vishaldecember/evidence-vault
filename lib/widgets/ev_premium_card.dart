@@ -5,11 +5,13 @@ import '../../theme/app_colors.dart';
 class EVPremiumCard extends StatefulWidget {
   final Widget child;
   final Duration delay;
+  final EdgeInsetsGeometry? padding;
 
   const EVPremiumCard({
     super.key,
     required this.child,
     this.delay = const Duration(milliseconds: 150),
+    this.padding,
   });
 
   @override
@@ -60,7 +62,7 @@ class _EVPremiumCardState extends State<EVPremiumCard>
         position: _slideAnimation,
         child: Container(
           width: double.infinity,
-          padding: const EdgeInsets.all(AppSpacing.cardPadding),
+          padding: widget.padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
           decoration: BoxDecoration(
             color: AppColors.background,
             borderRadius: BorderRadius.circular(AppSpacing.cardRadius),

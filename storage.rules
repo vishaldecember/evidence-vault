@@ -1,0 +1,44 @@
+rules_version = '2';
+
+// Sprint 4D — Production Storage rules for Evidence Vault.
+// Canonical hierarchy:
+// users/{userId}/incidents/{incidentId}/{photos|videos|voice|attachments|thumbnails}/{file}
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function allowedMediaType(mediaType) {
+      return mediaType in ['photos', 'videos', 'voice', 'attachments', 'thumbnails'];
+    }
+
+    function allowedContentType() {
+      return request.resource.contentType.matches('image/.*')
+        || request.resource.contentType.matches('video/.*')
+        || request.resource.contentType.matches('audio/.*')
+        || request.resource.contentType == 'application/pdf'
+        || request.resource.contentType == 'application/octet-stream'
+        || request.resource.contentType.matches('application/.*');
+    }
+
+    // 500 MB hard cap (videos); photos should be compressed client-side first.
+    function underSizeLimit() {
+      return request.resource.size < 500 * 1024 * 1024;
+    }
+
+    match /users/{userId}/incidents/{incidentId}/{mediaType}/{fileName} {
+      allow read: if isOwner(userId) && allowedMediaType(mediaType);
+
+      // Create only — prevents overwriting existing evidence objects.
+      allow create: if isOwner(userId)
+        && allowedMediaType(mediaType)
+        && underSizeLimit()
+        && allowedContentType();
+
+      allow update: if false;
+
+      allow delete: if isOwner(userId) && allowedMediaType(mediaType);
+    }
+  }
+}

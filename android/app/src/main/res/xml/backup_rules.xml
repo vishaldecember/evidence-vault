@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Exclude plaintext evidence from Android Auto Backup. Other app data may
+     still back up. Evidence Vault does not application-encrypt local files. -->
+<full-backup-content>
+    <exclude domain="file" path="evidence_cache" />
+    <exclude domain="file" path="trust_package_exports" />
+    <exclude domain="root" path="app_flutter/evidence_cache" />
+    <exclude domain="root" path="app_flutter/trust_package_exports" />
+</full-backup-content>

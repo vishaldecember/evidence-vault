@@ -1,0 +1,89 @@
+rules_version = '2';
+
+// Sprint 4D — Production Firestore rules for Evidence Vault.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function preservesImmutableIncidentFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['createdAt', 'ownerId', 'incidentId']);
+    }
+
+    function preservesImmutableEvidenceFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['createdAt', 'evidenceId', 'userId', 'incidentId']);
+    }
+
+    function preservesImmutableIncidentCollectionFields() {
+      return !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['createdAt', 'collectionId']);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId);
+      allow delete: if isOwner(userId);
+
+      match /incidentCollections/{collectionId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.collectionId == collectionId;
+        allow update: if isOwner(userId)
+          && preservesImmutableIncidentCollectionFields();
+        allow delete: if isOwner(userId);
+      }
+
+      match /incidents/{incidentId} {
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.ownerId == userId
+          && request.resource.data.incidentId == incidentId;
+        allow update: if isOwner(userId)
+          && resource.data.ownerId == userId
+          && preservesImmutableIncidentFields();
+        allow delete: if isOwner(userId)
+          && resource.data.ownerId == userId;
+
+        match /evidence/{evidenceId} {
+          allow read: if isOwner(userId);
+          allow create: if isOwner(userId)
+            && request.resource.data.userId == userId
+            && request.resource.data.evidenceId == evidenceId
+            && request.resource.data.incidentId == incidentId;
+          allow update: if isOwner(userId)
+            && resource.data.userId == userId
+            && preservesImmutableEvidenceFields();
+          allow delete: if isOwner(userId)
+            && resource.data.userId == userId;
+        }
+
+        match /timelineAnchors/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+        match /relationshipGroups/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+        match /relationships/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+        match /evidenceCollections/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+        match /narrativeEvents/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+        match /reconstructionNotes/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
+      }
+    }
+  }
+}

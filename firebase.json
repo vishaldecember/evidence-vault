@@ -1,0 +1,28 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "evidence-vault-dev",
+          "appId": "1:818342288871:android:66d17269bb2022b3f2f142",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "evidence-vault-dev",
+          "configurations": {
+            "android": "1:818342288871:android:66d17269bb2022b3f2f142",
+            "ios": "1:818342288871:ios:d7ab2eaae9877d8bf2f142"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "rules": "firestore.rules"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  }
+}

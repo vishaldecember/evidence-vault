@@ -11,6 +11,10 @@ class EVPasswordField extends StatefulWidget {
   final ValueChanged<String>? onChanged;
   final FormFieldSetter<String>? onSaved;
   final AutovalidateMode? autovalidateMode;
+  final FocusNode? focusNode;
+  final ValueChanged<String>? onFieldSubmitted;
+  final bool enabled;
+  final bool compact;
 
   const EVPasswordField({
     super.key,
@@ -21,6 +25,10 @@ class EVPasswordField extends StatefulWidget {
     this.onChanged,
     this.onSaved,
     this.autovalidateMode,
+    this.focusNode,
+    this.onFieldSubmitted,
+    this.enabled = true,
+    this.compact = false,
   });
 
   @override
@@ -33,35 +41,44 @@ class _EVPasswordFieldState extends State<EVPasswordField> {
   @override
   Widget build(BuildContext context) {
     return TextFormField(
+      enabled: widget.enabled,
+      focusNode: widget.focusNode,
       obscureText: _obscure,
       textInputAction: widget.textInputAction,
       validator: widget.validator,
       onChanged: widget.onChanged,
       onSaved: widget.onSaved,
+      onFieldSubmitted: widget.onFieldSubmitted,
       autovalidateMode: widget.autovalidateMode,
       style: AppTextStyles.label,
       decoration: InputDecoration(
         labelText: widget.label,
         hintText: widget.hint,
         hintStyle: AppTextStyles.caption,
+        isDense: widget.compact,
         prefixIcon: const Icon(
           Icons.lock_outline,
           color: AppColors.primary,
         ),
         suffixIcon: IconButton(
+          tooltip: _obscure ? 'Show password' : 'Hide password',
           icon: Icon(
             _obscure
                 ? Icons.visibility_off_outlined
                 : Icons.visibility_outlined,
             color: AppColors.textSecondary,
           ),
-          onPressed: () => setState(() => _obscure = !_obscure),
+          onPressed: widget.enabled
+              ? () => setState(() => _obscure = !_obscure)
+              : null,
         ),
         filled: true,
         fillColor: AppColors.card,
-        contentPadding: const EdgeInsets.symmetric(
+        contentPadding: EdgeInsets.symmetric(
           horizontal: AppSpacing.lg,
-          vertical: AppSpacing.lg + 2,
+          vertical: widget.compact
+              ? AppSpacing.fieldPaddingVerticalCompact
+              : AppSpacing.lg + 2,
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppSpacing.fieldRadius),

@@ -1,0 +1,141 @@
+Resolving dependencies...
+Downloading packages...
+  _flutterfire_internals 1.3.75 (1.3.76 available)
+  camera 0.11.4 (0.12.0+2 available)
+  camera_android_camerax 0.6.30 (0.7.4+4 available)
+  camera_avfoundation 0.9.23+2 (0.10.2 available)
+  cloud_firestore 6.7.1 (6.8.0 available)
+  cloud_firestore_platform_interface 8.0.5 (8.0.6 available)
+  cloud_firestore_web 5.7.1 (5.7.2 available)
+  dbus 0.7.13 (0.7.14 available)
+  device_info_plus 11.5.0 (13.2.0 available)
+  device_info_plus_platform_interface 7.0.3 (8.1.0 available)
+  file_picker 8.3.7 (11.0.3 available)
+  firebase_auth 6.5.6 (6.5.7 available)
+  firebase_auth_platform_interface 9.0.5 (9.0.6 available)
+  firebase_auth_web 6.2.5 (6.2.6 available)
+  firebase_core 4.12.1 (4.13.0 available)
+  firebase_core_platform_interface 8.0.0 (8.1.0 available)
+  firebase_core_web 3.9.1 (3.10.0 available)
+  firebase_storage 13.4.5 (13.4.6 available)
+  firebase_storage_platform_interface 6.0.5 (6.0.6 available)
+  firebase_storage_web 3.11.11 (3.11.12 available)
+  geolocator 13.0.4 (14.0.3 available)
+  geolocator_android 4.6.2 (5.0.3 available)
+  hooks 2.0.2 (2.1.0 available)
+  jni 1.0.0 (1.0.3 available)
+  jni_flutter 1.0.1 (1.0.2 available)
+  local_auth 2.3.0 (3.0.2 available)
+  local_auth_android 1.0.56 (2.0.9 available)
+  local_auth_darwin 1.6.1 (2.0.3 available)
+  local_auth_windows 1.0.11 (2.0.1 available)
+  matcher 0.12.19 (0.12.20 available)
+  meta 1.18.0 (1.19.0 available)
+  objective_c 9.4.1 (9.5.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  permission_handler 11.4.0 (13.0.0 available)
+  permission_handler_android 12.1.0 (14.0.0 available)
+  permission_handler_apple 9.4.10 (9.5.0 available)
+  permission_handler_html 0.1.3+5 (0.1.4+1 available)
+  permission_handler_platform_interface 4.3.0 (4.4.0 available)
+  permission_handler_windows 0.2.1 (0.2.2 available)
+  qr 3.0.2 (4.0.0 available)
+  record 6.2.1 (7.1.1 available)
+  record_android 1.5.2 (2.1.2 available)
+  record_ios 1.2.1 (2.1.1 available)
+  record_linux 1.3.1 (2.1.1 available)
+  record_macos 1.2.2 (2.1.1 available)
+  record_platform_interface 1.6.0 (2.1.0 available)
+  record_use 0.6.0 (1.0.0 available)
+  record_web 1.3.0 (2.1.2 available)
+  record_windows 1.0.7 (2.2.3 available)
+  share_plus 11.1.0 (13.3.0 available)
+  share_plus_platform_interface 6.1.0 (7.2.0 available)
+  test_api 0.7.11 (0.7.13 available)
+  vector_graphics 1.2.2 (1.2.3 available)
+  vector_graphics_compiler 1.2.6 (1.3.0 available)
+  vector_math 2.2.0 (2.4.2 available)
+  win32 5.15.0 (6.4.0 available)
+  win32_registry 2.1.0 (3.0.3 available)
+Got dependencies!
+57 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+Analyzing evidence_vault...                                     
+
+   info - Use an initializing formal to assign a parameter to a field. Try using an initialing formal ('this._controller') to initialize the field - lib\controllers\investigation_coaching_controller.dart:13:9 - prefer_initializing_formals
+warning - Unused import: '../../models/relationship_group_confidence.dart'. Try removing the import directive - lib\domain\trust_package\trust_package_assembler.dart:6:8 - unused_import
+warning - Unused import: '../domain/investigation_health/health_finding_status.dart'. Try removing the import directive - lib\engines\investigation_health_engine.dart:5:8 - unused_import
+warning - Unused import: '../services/narrative_validation_service.dart'. Try removing the import directive - lib\engines\investigation_health_engine.dart:24:8 - unused_import
+warning - The value of the local variable 'orderedAnchorIds' isn't used. Try removing the variable or using it - lib\engines\narrative_builder.dart:71:11 - unused_local_variable
+warning - The '!' will have no effect because the receiver can't be null. Try removing the '!' operator - lib\engines\narrative_builder.dart:92:25 - unnecessary_non_null_assertion
+warning - Unused import: '../domain/incident/incident.dart'. Try removing the import directive - lib\mappers\evidence_projection.dart:5:8 - unused_import
+warning - Unused import: '../domain/reconstruction/reconstruction_note.dart'. Try removing the import directive - lib\mappers\evidence_projection.dart:6:8 - unused_import
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\mappers\evidence_projection.dart:81:9 - use_null_aware_elements
+warning - Unused import: '../domain/evidence/captured_evidence_type.dart'. Try removing the import directive - lib\migration\workspace_state_migration.dart:2:8 - unused_import
+warning - Unused import: '../domain/evidence/supporting_evidence_type.dart'. Try removing the import directive - lib\migration\workspace_state_migration.dart:4:8 - unused_import
+warning - Unused import: '../models/verification_factory.dart'. Try removing the import directive - lib\migration\workspace_state_migration.dart:13:8 - unused_import
+warning - Unused import: '../models/workspace_evidence_item.dart'. Try removing the import directive - lib\migration\workspace_state_migration.dart:14:8 - unused_import
+warning - Unused import: '../models/trust_package_model.dart'. Try removing the import directive - lib\navigation\app_navigation.dart:13:8 - unused_import
+warning - Unused import: '../screens/evidence_workspace_screen.dart'. Try removing the import directive - lib\navigation\app_navigation.dart:19:8 - unused_import
+warning - Unused import: '../screens/investigation_workspace_screen.dart'. Try removing the import directive - lib\navigation\app_navigation.dart:20:8 - unused_import
+warning - Unused import: 'incident_store.dart'. Try removing the import directive - lib\repositories\evidence_repository.dart:4:8 - unused_import
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\repositories\firebase\firestore_serializers.dart:252:9 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\repositories\firebase\firestore_serializers.dart:428:7 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\repositories\firebase\firestore_serializers.dart:429:7 - use_null_aware_elements
+warning - Unused import: '../domain/evidence/supporting_evidence.dart'. Try removing the import directive - lib\repositories\workspace_evidence_repository.dart:1:8 - unused_import
+   info - Invalid use of a private type in a public API. Try making the private type public, or making the API that uses the private type also be private - lib\screens\incident_workspace_shell.dart:36:10 - library_private_types_in_public_api
+   info - 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss. Try replacing the use of the deprecated member with the replacement - lib\screens\splash_screen.dart:374:33 - deprecated_member_use
+   info - Don't use 'BuildContext's across async gaps, guarded by an unrelated 'mounted' check. Guard a 'State.context' use with a 'mounted' check on the State, and other BuildContext use with a 'mounted' check on the BuildContext - lib\screens\welcome_name_screen.dart:58:9 - use_build_context_synchronously
+   info - Use an initializing formal to assign a parameter to a field. Try using an initialing formal ('this._stateProvider') to initialize the field - lib\services\auth\authentication_service.dart:17:9 - prefer_initializing_formals
+warning - Unused import: '../models/connection_group_node.dart'. Try removing the import directive - lib\services\investigation_narrative_reference_resolver.dart:2:8 - unused_import
+   info - Use an initializing formal to assign a parameter to a field. Try using an initialing formal ('this._exportDirectoryProvider') to initialize the field - lib\services\trust_package\trust_package_export_service.dart:46:8 - prefer_initializing_formals
+warning - The '!' will have no effect because the receiver can't be null. Try removing the '!' operator - lib\services\trust_package\trust_package_export_service.dart:104:49 - unnecessary_non_null_assertion
+warning - The '!' will have no effect because the receiver can't be null. Try removing the '!' operator - lib\services\trust_package\trust_package_export_service.dart:169:38 - unnecessary_non_null_assertion
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\connections\connections_section.dart:47:35 - unnecessary_underscores
+warning - Unused import: '../../models/workspace_evidence_item.dart'. Try removing the import directive - lib\widgets\connections\connections_workspace_body.dart:7:8 - unused_import
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\evidence\evidence_artifact_card.dart:89:33 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\evidence\evidence_artifact_card.dart:93:33 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\evidence\evidence_artifact_card.dart:137:23 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\evidence\evidence_artifact_card.dart:138:23 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\evidence\evidence_artifact_card.dart:139:23 - use_null_aware_elements
+   info - 'value' is deprecated and shouldn't be used. Use initialValue instead. This will set the initial value for the form field. This feature was deprecated after v3.33.0-1.0.pre. Try replacing the use of the deprecated member with the replacement - lib\widgets\evidence\evidence_category_selector.dart:26:11 - deprecated_member_use
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\evidence_inspector\renderers\attachment_evidence_renderer.dart:51:41 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\evidence_inspector\renderers\attachment_evidence_renderer.dart:51:45 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\evidence_inspector\renderers\photo_evidence_renderer.dart:26:35 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\evidence_inspector\renderers\photo_evidence_renderer.dart:26:39 - unnecessary_underscores
+warning - Unused import: 'dart:io'. Try removing the import directive - lib\widgets\evidence_inspector\renderers\voice_evidence_renderer.dart:2:8 - unused_import
+warning - Unused import: '../../models/workspace_evidence_item.dart'. Try removing the import directive - lib\widgets\investigation\connections_workspace.dart:6:8 - unused_import
+warning - Unused import: '../../theme/app_colors.dart'. Try removing the import directive - lib\widgets\investigation\inspector_relationship_groups_section.dart:7:8 - unused_import
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\investigation\investigation_stage_header.dart:41:11 - use_null_aware_elements
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\investigation\investigation_workspace_navigation_header.dart:66:17 - use_null_aware_elements
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\reconstruction\investigation_narrative_segment.dart:54:29 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - lib\widgets\timeline\timeline_workspace_filters.dart:26:31 - unnecessary_underscores
+warning - Unused import: '../../../repositories/trust_package_archive_store.dart'. Try removing the import directive - lib\widgets\trust_package\export\trust_package_share_sheet.dart:8:8 - unused_import
+warning - Unused import: '../../../services/trust_package/trust_package_export_service.dart'. Try removing the import directive - lib\widgets\trust_package\export\trust_package_share_sheet.dart:9:8 - unused_import
+   info - Use the null-aware marker '?' rather than a null check via an 'if'. Try using '?' - lib\widgets\workspace\capture_section_header.dart:44:13 - use_null_aware_elements
+   info - 'hasFlag' is deprecated and shouldn't be used. Use flagsCollection instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement - test\accessibility_test.dart:21:27 - deprecated_member_use
+   info - 'hasFlag' is deprecated and shouldn't be used. Use flagsCollection instead. This feature was deprecated after v3.32.0-0.0.pre. Try replacing the use of the deprecated member with the replacement - test\accessibility_test.dart:25:27 - deprecated_member_use
+warning - Unused import: 'package:evidence_vault/controllers/workspace_session.dart'. Try removing the import directive - test\connections_workspace_test.dart:6:8 - unused_import
+warning - Unused import: 'package:evidence_vault/screens/evidence_workspace_screen.dart'. Try removing the import directive - test\connections_workspace_test.dart:10:8 - unused_import
+warning - Unused import: 'package:evidence_vault/models/investigation_methodology_stage.dart'. Try removing the import directive - test\evidence_collection_sync_test.dart:3:8 - unused_import
+warning - Unused import: 'package:evidence_vault/models/evidence_record_model.dart'. Try removing the import directive - test\evidence_record_simplification_test.dart:2:8 - unused_import
+   info - Unnecessary use of multiple underscores. Try using '_' - test\evidence_record_simplification_test.dart:56:31 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - test\evidence_record_simplification_test.dart:84:31 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - test\evidence_record_simplification_test.dart:104:31 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - test\evidence_record_simplification_test.dart:105:35 - unnecessary_underscores
+   info - Unnecessary use of multiple underscores. Try using '_' - test\evidence_record_simplification_test.dart:125:31 - unnecessary_underscores
+warning - Unused import: 'package:evidence_vault/domain/incident/incident_aggregate.dart'. Try removing the import directive - test\incident_aggregate_test.dart:4:8 - unused_import
+warning - Unused import: 'package:evidence_vault/controllers/reconstruction_canvas_controller.dart'. Try removing the import directive - test\investigation_evidence_inspector_test.dart:1:8 - unused_import
+   info - The import of 'package:flutter/services.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart'. Try removing the import directive - test\investigation_evidence_inspector_test.dart:16:8 - unnecessary_import
+warning - Unused import: 'package:evidence_vault/screens/investigation_workspace_screen.dart'. Try removing the import directive - test\investigation_journey_header_test.dart:8:8 - unused_import
+warning - Unused import: 'package:evidence_vault/engines/narrative_builder.dart'. Try removing the import directive - test\investigation_workspace_test.dart:3:8 - unused_import
+   info - The import of 'dart:async' is unnecessary because all of the used elements are also provided by the import of 'package:flutter_test/flutter_test.dart'. Try removing the import directive - test\privacy_controls_test.dart:1:8 - unnecessary_import
+warning - Unused import: 'package:evidence_vault/models/investigation_methodology_stage.dart'. Try removing the import directive - test\timeline_workspace_test.dart:8:8 - unused_import
+warning - Unused import: 'package:evidence_vault/screens/evidence_workspace_screen.dart'. Try removing the import directive - test\timeline_workspace_test.dart:9:8 - unused_import
+warning - Unused import: 'package:evidence_vault/widgets/trust_package/preview/trust_package_preview.dart'. Try removing the import directive - test\trust_package_export_test.dart:15:8 - unused_import
+warning - Unused import: 'package:evidence_vault/models/workspace_capture_mode.dart'. Try removing the import directive - test\workspace_connect_mode_test.dart:4:8 - unused_import
+warning - Unused import: 'package:evidence_vault/screens/evidence_workspace_screen.dart'. Try removing the import directive - test\workspace_connect_mode_test.dart:9:8 - unused_import
+warning - Unused import: 'package:evidence_vault/widgets/workspace/capture_bar.dart'. Try removing the import directive - test\workspace_connect_mode_test.dart:10:8 - unused_import
+warning - Unused import: 'package:evidence_vault/screens/investigation_workspace_screen.dart'. Try removing the import directive - test\workspace_navigation_state_test.dart:12:8 - unused_import
+
+75 issues found. (ran in 102.9s)

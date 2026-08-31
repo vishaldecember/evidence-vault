@@ -51,6 +51,14 @@
 	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Evidence Vault needs camera access to capture photo and video evidence.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Evidence Vault needs microphone access to record audio and video evidence.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Evidence Vault needs photo library access to import documents and images.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Evidence Vault captures location metadata with each evidence item.</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>
@@ -65,6 +73,18 @@
 		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<!-- Replace REVERSED_CLIENT_ID after FlutterFire configure (Google Sign-In). -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>com.googleusercontent.apps.REPLACE_WITH_REVERSED_CLIENT_ID</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

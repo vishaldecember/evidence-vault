@@ -12,11 +12,14 @@ abstract final class AppSpacing {
 
   static const double screenHorizontal = 24;
   static const double cardPadding = 24;
-  static const double cardRadius = 28;
+  static const double cardRadius = 22;
   static const double fieldRadius = 18;
   static const double buttonRadius = 18;
   static const double buttonHeight = 58;
   static const double socialButtonHeight = 56;
   static const double logoSizeLarge = 72;
   static const double logoSizeCompact = 56;
+  /// ~20% smaller than [logoSizeCompact] for streamlined create-account hero.
+  static const double logoSizeOnboarding = 45;
+  static const double fieldPaddingVerticalCompact = 14;
 }

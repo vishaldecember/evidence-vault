@@ -24,11 +24,36 @@ abstract final class AppTextStyles {
     letterSpacing: -0.4,
   );
 
-  static const heading = TextStyle(
-    fontSize: 20,
+  /// Home hero and workspace screen identity.
+  static const heroTitle = TextStyle(
+    fontSize: 30,
+    fontWeight: FontWeight.w800,
+    color: AppColors.onCanvas,
+    letterSpacing: -0.6,
+    height: 1.22,
+  );
+
+  static const heroSubtitle = TextStyle(
+    fontSize: 15,
+    height: 1.45,
+    fontWeight: FontWeight.w400,
+    color: AppColors.onCanvasSecondary,
+    letterSpacing: 0.1,
+  );
+
+  /// Emphasis within cards — evidence type, context labels.
+  static const emphasisLabel = TextStyle(
+    fontSize: 14,
     fontWeight: FontWeight.w600,
     color: AppColors.navy,
-    letterSpacing: -0.3,
+  );
+
+  static const heading = TextStyle(
+    fontSize: 21,
+    fontWeight: FontWeight.w700,
+    color: AppColors.navy,
+    letterSpacing: -0.35,
+    height: 1.25,
   );
 
   static const body = TextStyle(
@@ -87,7 +112,7 @@ abstract final class AppTextStyles {
   );
 
   static const strengthLabel = TextStyle(
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: FontWeight.w500,
     color: AppColors.textSecondary,
   );
