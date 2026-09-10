@@ -8,7 +8,6 @@ import '../constants/app_spacing.dart';
 import '../controllers/workspace_evidence_controller.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
-import '../models/evidence_type.dart';
 import '../models/reflection_model.dart';
 import '../models/temporary_relationship_group.dart';
 import '../models/workspace_capture_mode.dart';
@@ -16,13 +15,8 @@ import '../models/workspace_evidence_item.dart';
 import '../navigation/app_navigation.dart';
 import '../navigation/app_navigator.dart';
 import '../screens/capture/capture_cockpit_screen.dart';
-import '../services/capture/capture_engine.dart';
-import '../services/permission_service.dart';
 import '../services/storage/capture_media_service.dart';
-import '../services/storage/evidence_upload_coordinator.dart';
-import '../services/storage/evidence_upload_feedback.dart';
 import '../services/storage/file_attach_flow.dart';
-import '../services/storage/local_evidence_cache.dart';
 import '../widgets/capture/text_note_capture_sheet.dart';
 import '../widgets/common/app_snackbar.dart';
 import '../widgets/reflection/reflection_editor_sheet.dart';
@@ -374,84 +368,60 @@ class EvidenceWorkspaceContentState extends State<EvidenceWorkspaceContent> {
       return;
     }
 
-    // File attachment — one-shot picker; must not navigate Home on resume.
-    final evidenceType = EvidenceType.document;
-    final permitted = await PermissionService.ensureAll(
-      context,
-      PermissionService.requiredFor(evidenceType),
-    );
-    if (!permitted ||
-        !mounted ||
-        !_operationOwnsBound(boundIncidentIdAtStart)) {
-      return;
-    }
-
-    final media = await CaptureMediaService.acquire(mode);
-    if (!mounted || !_operationOwnsBound(boundIncidentIdAtStart)) {
-      return;
-    }
-    if (media == null) {
-      return;
-    }
-
-    final coordinator = EvidenceUploadCoordinator.instance;
-    late final String newId;
-    try {
-      newId = await _controller.preserveEvidenceWithMedia(
-        mode: mode,
-        media: media,
-        uploadCoordinator: coordinator,
-        mimeType: _guessMime(media.fileName),
-        linkToNearestPrimary: false,
-      );
-    } on StaleCaptureIncidentException {
-      return;
-    } on MediaDurabilityException {
-      if (mounted) {
-        AppSnackBar.showError(
-          context,
-          'Couldn’t preserve that attachment. Try again.',
-        );
-      }
-      return;
-    }
-
-    if (!mounted || !_operationOwnsBound(boundIncidentIdAtStart)) {
-      return;
-    }
-    setState(() {
-      _activeCaptureMode = mode;
-      _animateEvidenceId = newId;
-    });
-    AppSnackBar.showSuccess(context, 'Attachment preserved.');
-    EvidenceUploadFeedback.listenAndReport(
-      context: context,
-      coordinator: coordinator,
-      evidenceId: newId,
-      onRetry: () async {
-        await _controller.retryEvidenceUpload(
-          newId,
-          uploadCoordinator: coordinator,
-        );
-      },
-    );
+    await attachCaptureFile();
   }
 
-  String? _guessMime(String fileName) {
-    final lower = fileName.toLowerCase();
-    if (lower.endsWith('.pdf')) {
-      return 'application/pdf';
+  /// Canonical File attach for shell Capture. Same [FileAttachFlow.attach]
+  /// transaction as Workspace sticky File. Does not mint a new incident.
+  @visibleForTesting
+  Future<FileAttachResult> attachCaptureFile({
+    Future<CapturedMediaFile?> Function()? acquireFile,
+  }) async {
+    final boundIncidentIdAtStart = widget.boundIncidentId;
+    final sourceIncidentId = _controller.currentIncident.id;
+    try {
+      final result = await FileAttachFlow.attach(
+        origin: FileAttachOrigin.workspaceSticky,
+        context: mounted ? context : null,
+        buildWorkspace:
+            widget.buildFileAttachWorkspace ?? () => const SizedBox.shrink(),
+        acquireFile: acquireFile,
+      );
+      if (result.outcome == FileAttachOutcome.failed) {
+        final msg =
+            result.userMessage ?? 'Couldn’t attach that file. Try again.';
+        final snackCtx = mounted ? context : appNavigatorKey.currentContext;
+        if (snackCtx != null && snackCtx.mounted) {
+          AppSnackBar.showError(snackCtx, msg);
+        }
+      } else if (result.outcome == FileAttachOutcome.succeeded &&
+          mounted &&
+          _operationOwnsBound(boundIncidentIdAtStart)) {
+        setState(() {
+          _activeCaptureMode = WorkspaceCaptureMode.file;
+          _animateEvidenceId = result.evidenceId;
+        });
+      }
+      assert(
+        result.sourceIncidentId == sourceIncidentId ||
+            result.outcome != FileAttachOutcome.succeeded,
+        'Capture File must keep the same incident',
+      );
+      return result;
+    } catch (_) {
+      final snackCtx = mounted ? context : appNavigatorKey.currentContext;
+      if (snackCtx != null && snackCtx.mounted) {
+        AppSnackBar.showError(
+          snackCtx,
+          'Couldn’t attach that file. Try again.',
+        );
+      }
+      return FileAttachResult(
+        outcome: FileAttachOutcome.failed,
+        sourceIncidentId: sourceIncidentId,
+        userMessage: 'Couldn’t attach that file. Try again.',
+      );
     }
-    if (lower.endsWith('.png')) {
-      return 'image/png';
-    }
-    if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) {
-      return 'image/jpeg';
-    }
-    if (lower.endsWith('.txt')) {
-      return 'text/plain';
-    }
-    return 'application/octet-stream';
   }
 
   void _cancelConnectMode() {

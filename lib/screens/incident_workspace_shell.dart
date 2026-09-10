@@ -164,6 +164,7 @@ class IncidentWorkspaceShellState extends State<IncidentWorkspaceShell> {
         onShowEvidenceInspector: _showEvidenceInspector,
         onEnterInvestigation: () =>
             _handleStageSelected(InvestigationMethodologyStage.investigation),
+        buildFileAttachWorkspace: _buildCaptureFileAttachWorkspace,
       ),
       InvestigationMethodologyStage.evidence => EvidenceWorkspaceContent(
         key: ValueKey('evidence-stage-$_boundIncidentId'),
@@ -205,6 +206,14 @@ class IncidentWorkspaceShellState extends State<IncidentWorkspaceShell> {
 
   Widget _ensureStage(InvestigationMethodologyStage stage) {
     return _stageCache.putIfAbsent(stage, () => _buildStage(stage));
+  }
+
+  Widget _buildCaptureFileAttachWorkspace() {
+    return IncidentWorkspaceShell(
+      incidentId: _boundIncidentId,
+      controller: _controller,
+      initialStage: InvestigationMethodologyStage.capture,
+    );
   }
 
   Widget _buildOrganizeFileAttachWorkspace() {
