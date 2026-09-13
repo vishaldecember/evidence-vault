@@ -7,6 +7,11 @@ import 'package:flutter/foundation.dart'
 /// Default [FirebaseOptions] for use with your Firebase apps.
 ///
 /// Project: evidence-vault-dev (Evidence Vault Dev)
+///
+/// Client API keys in this file are not private secrets, but they MUST be
+/// restricted in Google Cloud Console (Android app / iOS bundle, APIs).
+/// App Check enforcement, key restrictions, and deployed rules
+/// REQUIRES DEVICE/CONSOLE VERIFICATION.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {

@@ -75,7 +75,7 @@ void main() {
       },
     );
 
-    test('unknown location keeps time on X and an editable red-icon band', () {
+    test('unknown location keeps time on X and a read-only unavailable band', () {
       final plot = ReconstructionCanvasLayout.fromEvidence(
         evidence: [
           _item(
@@ -95,10 +95,43 @@ void main() {
       final unknown = plot.bands.singleWhere(
         (band) => band.key == ReconstructionCanvasLayout.unknownKey,
       );
-      expect(unknown.label, 'Add location');
-      expect(unknown.editable, isTrue);
+      expect(
+        unknown.label,
+        ReconstructionCanvasLayout.locationUnavailableLabel,
+      );
       expect(unknown.y < known.position.dy, isTrue);
     });
+
+    test(
+      'location collection without GPS stays unavailable, not a user name',
+      () {
+        final plot = ReconstructionCanvasLayout.fromEvidence(
+          evidence: [
+            _item(id: 'photo', capturedAt: DateTime.utc(2026, 8, 28, 4, 42)),
+          ],
+          collections: [
+            EvidenceCollection(
+              id: 'loc-1',
+              incidentId: 'inc-A',
+              name: 'Café ABC',
+              systemGenerated: false,
+              displayOrder: 0,
+              createdAt: DateTime.utc(2026, 8, 28),
+              updatedAt: DateTime.utc(2026, 8, 28),
+              category: 'location',
+              memberEvidenceIds: const ['photo'],
+            ),
+          ],
+        );
+
+        expect(plot.bands, hasLength(1));
+        expect(
+          plot.bands.single.label,
+          ReconstructionCanvasLayout.locationUnavailableLabel,
+        );
+        expect(plot.bands.single.key, ReconstructionCanvasLayout.unknownKey);
+      },
+    );
 
     test(
       'location collections beat coordinates; labels stay unique per band',
@@ -130,6 +163,24 @@ void main() {
         expect(plot.bands, hasLength(1));
         expect(plot.bands.single.label, 'Café ABC');
         expect(plot.bands.single.key, 'loc:loc-1');
+      },
+    );
+
+    test(
+      'location band keeps stored coordinates for the complete GPS reveal',
+      () {
+        final plot = ReconstructionCanvasLayout.fromEvidence(
+          evidence: [
+            _item(
+              id: 'photo',
+              capturedAt: DateTime.utc(2026, 8, 28, 4, 42),
+              latitude: 30.086731,
+              longitude: 78.267608,
+            ),
+          ],
+        );
+        expect(plot.bands.single.latitude, 30.086731);
+        expect(plot.bands.single.longitude, 78.267608);
       },
     );
 

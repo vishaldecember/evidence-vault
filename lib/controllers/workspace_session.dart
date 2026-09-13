@@ -509,14 +509,9 @@ class WorkspaceSession extends ChangeNotifier {
         return;
       }
       notifyListeners();
-      // Library cards can show a durable count while this shell is still empty.
-      // Wait for the existing cloud restore when local hydrate found nothing —
-      // never invent or copy evidence.
-      if (controller.currentIncident.evidenceCount == 0) {
-        await _enrichOpenIncidentFromCloud(targetId, generation);
-      } else {
-        unawaited(_enrichOpenIncidentFromCloud(targetId, generation));
-      }
+      // Cloud restore is secondary: never invent or copy evidence, and never
+      // keep Library / Vault navigation waiting on Firestore.
+      unawaited(_enrichOpenIncidentFromCloud(targetId, generation));
       unawaited(IncidentLibraryService.instance.refresh());
     } catch (error) {
       debugPrint('[Session] finish open local work failed: $error');

@@ -172,6 +172,26 @@ void main() {
       expect(persisted.containsKey('organizeReadinessStatus'), isFalse);
     });
 
+    test(
+      'empty shell routes Capture immediately without waiting for hydrate',
+      () async {
+        final session = WorkspaceSession.instance;
+        session.controller.replaceAggregate(
+          IncidentAggregate.shell(id: 'inc-pending', title: 'Pending'),
+        );
+        expect(session.controller.currentIncident.evidence, isEmpty);
+
+        final stopwatch = Stopwatch()..start();
+        final stage = await IncidentWorkspaceEntry.resolveAfterHydrate(session);
+        stopwatch.stop();
+
+        expect(stage, InvestigationMethodologyStage.capture);
+        expect(session.controller.currentIncident.id, 'inc-pending');
+        expect(session.controller.currentIncident.evidence, isEmpty);
+        expect(stopwatch.elapsedMilliseconds, lessThan(100));
+      },
+    );
+
     test('G. unevaluable working set falls back to Capture, never ready', () {
       WorkspaceSession.instance.controller.replaceAggregate(
         IncidentAggregate.shell(id: '', title: ''),

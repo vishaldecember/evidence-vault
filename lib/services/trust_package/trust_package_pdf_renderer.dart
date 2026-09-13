@@ -23,7 +23,7 @@ abstract final class TrustPackagePdfRenderer {
     final document = pw.Document(
       title: package.incidentSummary.incidentName,
       author: package.metadata.generatedBy,
-      creator: 'Evidence Vault Trust Package Export',
+      creator: 'My Truth Trust Package Export',
       subject: embedded['trustPackageId'],
       keywords:
           'trustPackageId=${embedded['trustPackageId']};'

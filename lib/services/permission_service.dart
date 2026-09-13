@@ -105,13 +105,13 @@ abstract final class PermissionService {
   static String _messageFor(EvidencePermission permission) {
     return switch (permission) {
       EvidencePermission.camera =>
-        'Evidence Vault needs camera access to capture photos and videos. '
+        'My Truth needs camera access to capture photos and videos. '
             'You can enable this in your device settings.',
       EvidencePermission.microphone =>
-        'Evidence Vault needs microphone access to record audio evidence. '
+        'My Truth needs microphone access to record audio evidence. '
             'You can enable this in your device settings.',
       EvidencePermission.location =>
-        'Evidence Vault captures location metadata with each evidence item. '
+        'My Truth captures location metadata with each evidence item. '
             'Location access helps verify when and where evidence was collected.',
     };
   }

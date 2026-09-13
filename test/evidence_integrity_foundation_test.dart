@@ -51,6 +51,10 @@ void main() {
     final thumbHash = await EvidenceIntegrity.sha256OfFile(thumbnail.path);
     expect(originalHash, isNot(thumbHash));
     expect(originalHash, EvidenceIntegrity.sha256OfBytes(knownBytes));
+    expect(
+      originalHash,
+      await EvidenceIntegrity.sha256OfFile(original.path),
+    );
 
     final check = await EvidenceIntegrity.verifyOriginal(
       recordedHash: originalHash,

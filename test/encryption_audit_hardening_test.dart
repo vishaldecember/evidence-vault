@@ -15,7 +15,11 @@ void main() {
       expect(TrustSecurityCopy.splashProtectionSubtitle, 'On this device');
       expect(
         TrustSecurityCopy.loginPrivacyCaption,
-        'Your evidence stays on this device. You control what you share.',
+        contains('synced to your account'),
+      );
+      expect(
+        TrustSecurityCopy.loginPrivacyCaption.toLowerCase(),
+        isNot(contains('stays on this device')),
       );
 
       const claimed = [
@@ -28,6 +32,10 @@ void main() {
         expect(line.toLowerCase(), isNot(contains('end-to-end')));
         expect(line.toLowerCase(), isNot(contains('e2e')));
       }
+      expect(
+        TrustSecurityCopy.loginPrivacyCaption.toLowerCase(),
+        contains('synced to your account'),
+      );
     });
   });
 
@@ -84,6 +92,9 @@ void main() {
       for (final xml in [backup, extraction]) {
         expect(xml, contains('evidence_cache'));
         expect(xml, contains('trust_package_exports'));
+        expect(xml, contains('attach_staging'));
+        expect(xml, contains('evidence_records.json'));
+        expect(xml, contains('FlutterSharedPreferences.xml'));
       }
       expect(manifest, contains('android:allowBackup="true"'));
       expect(manifest, contains('@xml/backup_rules'));

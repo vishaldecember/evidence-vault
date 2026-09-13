@@ -14,6 +14,7 @@ import '../../repositories/incident_store.dart';
 import '../../repositories/storage_repository.dart';
 import '../auth/firebase_bootstrap.dart';
 import '../storage/evidence_upload_models.dart';
+import '../storage/local_evidence_cache.dart';
 import '../user_session_service.dart';
 
 /// Write-through + hydrate between [IncidentStore] and Firestore (Sprint 4D).
@@ -63,6 +64,8 @@ class IncidentCloudSyncService {
 
   /// Hydrates an [IncidentAggregate] from Firestore for the signed-in user's
   /// active incident.
+  ///
+  /// Load-only: never mints an incident. Missing active/latest → `null`.
   Future<IncidentAggregate?> restoreActiveIncident() async {
     if (!_enabled) {
       return null;
@@ -73,13 +76,50 @@ class IncidentCloudSyncService {
     }
 
     try {
-      final incident = await _incidents.ensureIncident(userId: userId);
+      final incident = await resolveExistingActiveIncident(
+        userId: userId,
+        readActiveIncidentId: _incidents.readActiveIncidentId,
+        loadIncident: _incidents.loadIncident,
+        loadLatestIncident: _incidents.loadLatestIncident,
+        setActiveIncidentId: _incidents.setActiveIncidentId,
+      );
+      if (incident == null) {
+        return null;
+      }
       return await _restoreIncidentDocument(userId: userId, incident: incident);
     } catch (error, stack) {
       debugPrint('[Sync] restore failed: $error');
       debugPrint('$stack');
       return null;
     }
+  }
+
+  /// Active or latest existing incident. Never creates a cloud document.
+  @visibleForTesting
+  static Future<Incident?> resolveExistingActiveIncident({
+    required String userId,
+    required Future<String?> Function(String userId) readActiveIncidentId,
+    required Future<Incident?> Function(String userId, String incidentId)
+        loadIncident,
+    required Future<Incident?> Function(String userId) loadLatestIncident,
+    required Future<void> Function(String userId, String incidentId)
+        setActiveIncidentId,
+  }) async {
+    final activeId = await readActiveIncidentId(userId);
+    if (activeId != null && activeId.trim().isNotEmpty) {
+      final existing = await loadIncident(userId, activeId.trim());
+      if (existing != null) {
+        return existing;
+      }
+    }
+
+    final latest = await loadLatestIncident(userId);
+    if (latest != null) {
+      await setActiveIncidentId(userId, latest.id);
+      return latest;
+    }
+
+    return null;
   }
 
   /// Hydrates a specific incident (Library / incident switcher) and marks it
@@ -266,19 +306,25 @@ class IncidentCloudSyncService {
 
   /// Deletes one evidence item's Firestore doc + Storage files and removes
   /// every trace of it from the in-memory [store] (relationship groups,
-  /// relationships, captured/supporting lists).
+  /// relationships, captured/supporting lists) and [LocalEvidenceCache] index.
   Future<void> deleteEvidenceCascade({
     required String incidentId,
     required String evidenceId,
     required IncidentStore store,
   }) async {
     if (!_enabled) {
-      _removeEvidenceFromStore(store: store, evidenceId: evidenceId);
+      await _removeEvidenceFromStoreAndCache(
+        store: store,
+        evidenceId: evidenceId,
+      );
       return;
     }
     final userId = _userId;
     if (userId == null || userId.isEmpty) {
-      _removeEvidenceFromStore(store: store, evidenceId: evidenceId);
+      await _removeEvidenceFromStoreAndCache(
+        store: store,
+        evidenceId: evidenceId,
+      );
       return;
     }
 
@@ -288,7 +334,10 @@ class IncidentCloudSyncService {
         incidentId: incidentId,
         evidenceId: evidenceId,
       );
-      _removeEvidenceFromStore(store: store, evidenceId: evidenceId);
+      await _removeEvidenceFromStoreAndCache(
+        store: store,
+        evidenceId: evidenceId,
+      );
 
       try {
         await _storage.deleteEvidenceFiles(
@@ -305,6 +354,23 @@ class IncidentCloudSyncService {
     } catch (error, stack) {
       debugPrint('[Sync] delete cascade failed: $error');
       debugPrint('$stack');
+    }
+  }
+
+  /// Drops the working-set row and the durable cache index used for library counts.
+  static Future<void> _removeEvidenceFromStoreAndCache({
+    required IncidentStore store,
+    required String evidenceId,
+  }) async {
+    _removeEvidenceFromStore(store: store, evidenceId: evidenceId);
+    final id = evidenceId.trim();
+    if (id.isEmpty) {
+      return;
+    }
+    try {
+      await LocalEvidenceCache.remove(id);
+    } catch (error) {
+      debugPrint('[Sync] local cache remove skipped for $id: $error');
     }
   }
 

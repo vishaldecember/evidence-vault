@@ -31,7 +31,7 @@ class DefaultTrustPackageAssembler implements TrustPackageAssembler {
   }) : _narrativeBuilder = narrativeBuilder ?? const DefaultNarrativeBuilder();
 
   static const packageVersion = '1.0.0';
-  static const generatedBy = 'Evidence Vault';
+  static const generatedBy = 'My Truth';
   static const defaultIncidentType = 'General Incident';
 
   static const _relationshipPaletteHex = [
@@ -65,6 +65,10 @@ class DefaultTrustPackageAssembler implements TrustPackageAssembler {
       ),
       incident.id,
     );
+    final chronologyNodes = [
+      for (final node in timelineNodes)
+        if (node.capturedItem.kind.isPrimaryChronology) node,
+    ];
     final groupNodes = WorkspaceEvidenceRepository.connectionGroupNodes(
       store,
       aggregate.timelineRepository,
@@ -103,7 +107,7 @@ class DefaultTrustPackageAssembler implements TrustPackageAssembler {
     };
 
     final timelineSection = _buildTimelineSection(
-      timelineNodes: timelineNodes,
+      timelineNodes: chronologyNodes,
       groups: groups,
       itemById: itemById,
     );
@@ -147,7 +151,7 @@ class DefaultTrustPackageAssembler implements TrustPackageAssembler {
         aggregate: aggregate,
         items: items,
         relationships: relationships,
-        timelineAnchorCount: timelineNodes.length,
+        timelineAnchorCount: chronologyNodes.length,
         narrativeEventCount: narrativeEvents.length,
       ),
       timelineSection: timelineSection,

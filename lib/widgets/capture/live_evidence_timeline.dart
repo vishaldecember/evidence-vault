@@ -10,6 +10,7 @@ import '../../presentation/evidence_presentation_resolver.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/workspace_evidence_formatters.dart';
+import '../evidence_inspector/evidence_media_source.dart';
 
 /// Live chronological timeline — oldest at top, newest at bottom.
 ///
@@ -239,6 +240,10 @@ class _PhotoThumb extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final path = imagePath;
+    final cacheWidth = EvidenceMediaSource.decodeWidth(
+      logicalWidth: _VisualBadge._size,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppSpacing.fieldRadius),
       child: SizedBox(
@@ -249,6 +254,8 @@ class _PhotoThumb extends StatelessWidget {
                 File(path),
                 key: Key('live_timeline_photo_thumb_${item.id}'),
                 fit: BoxFit.cover,
+                cacheWidth: cacheWidth,
+                cacheHeight: cacheWidth,
                 errorBuilder: (_, _, _) => const _IconThumb(
                   icon: Icons.photo_camera_outlined,
                 ),
@@ -269,6 +276,10 @@ class _VideoThumb extends StatelessWidget {
   Widget build(BuildContext context) {
     final thumb = thumbnailPath;
     final hasThumb = thumb != null && File(thumb).existsSync();
+    final cacheWidth = EvidenceMediaSource.decodeWidth(
+      logicalWidth: _VisualBadge._size,
+      devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+    );
     return ClipRRect(
       borderRadius: BorderRadius.circular(AppSpacing.fieldRadius),
       child: SizedBox(
@@ -282,6 +293,8 @@ class _VideoThumb extends StatelessWidget {
                 File(thumb),
                 key: Key('live_timeline_video_thumb_${item.id}'),
                 fit: BoxFit.cover,
+                cacheWidth: cacheWidth,
+                cacheHeight: cacheWidth,
                 errorBuilder: (_, _, _) => ColoredBox(
                   color: AppColors.surfaceMuted,
                   child: Icon(

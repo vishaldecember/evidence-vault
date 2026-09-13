@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'diagnostics/release_logging.dart';
 import 'diagnostics/sprint6c_file_trace.dart';
 import 'navigation/app_navigator.dart';
 import 'services/evidence_storage_service.dart';
@@ -16,6 +17,7 @@ import 'widgets/evidence_inspector/pdf_native_viewer.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  installReleaseLogRedaction();
   PdfDocumentSurface.nativeBuilder = buildNativePdfViewer;
 
   await EvidenceStorageService.init();
@@ -43,7 +45,7 @@ class EvidenceVaultApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Evidence Vault',
+      title: 'My Truth',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       navigatorKey: appNavigatorKey,

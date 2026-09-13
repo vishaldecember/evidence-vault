@@ -1,6 +1,9 @@
 import 'package:evidence_vault/controllers/workspace_evidence_controller.dart';
+import 'package:evidence_vault/domain/incident/current_incident.dart';
 import 'package:evidence_vault/domain/incident/incident_aggregate.dart';
+import 'package:evidence_vault/domain/incident/incident_status.dart';
 import 'package:evidence_vault/domain/organize/organize_context_anchor.dart';
+import 'package:evidence_vault/models/journey_stage.dart';
 import 'package:evidence_vault/models/verification_factory.dart';
 import 'package:evidence_vault/models/workspace_capture_mode.dart';
 import 'package:evidence_vault/models/workspace_evidence_item.dart';
@@ -1008,51 +1011,224 @@ void main() {
     );
   });
 
-  testWidgets('short tap on a context tile opens Inspector and does not drag',
-      (tester) async {
-    addTearDown(() => tester.binding.setSurfaceSize(null));
-    await tester.binding.setSurfaceSize(const Size(390, 844));
+  testWidgets(
+    'unattached context: single tap keeps wobble; double tap opens once',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
 
-    final t0 = DateTime(2026, 8, 22, 10, 42);
-    final ordered = [
-      _item(id: 'photo', kind: WorkspaceEvidenceKind.image, at: t0),
-      _item(
-        id: 'note',
-        kind: WorkspaceEvidenceKind.note,
-        at: t0.add(const Duration(seconds: 15)),
-      ),
-    ];
-    final selected = <String>[];
-    final anchors = <OrganizeContextAnchor>[];
+      final t0 = DateTime(2026, 8, 22, 10, 42);
+      final ordered = [
+        _item(id: 'photo', kind: WorkspaceEvidenceKind.image, at: t0),
+        _item(
+          id: 'note',
+          kind: WorkspaceEvidenceKind.note,
+          at: t0.add(const Duration(seconds: 15)),
+        ),
+        _item(
+          id: 'voice',
+          kind: WorkspaceEvidenceKind.voice,
+          at: t0.add(const Duration(seconds: 30)),
+        ),
+      ];
+      final selected = <String>[];
+      final anchors = <OrganizeContextAnchor>[];
 
-    await tester.pumpWidget(
-      MaterialApp(
-        home: Scaffold(
-          body: OrganizeChronologyCanvas(
-            ordered: ordered,
-            allEvidence: ordered,
-            organizeCreatedIds: const {'note'},
-            onEvidenceSelected: (item) => selected.add(item.id),
-            onSetContextAnchor: (contextId, capturedId) {
-              anchors.add(
-                OrganizeContextAnchor(
-                  contextEvidenceId: contextId,
-                  capturedEvidenceId: capturedId,
-                ),
-              );
-            },
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrganizeChronologyCanvas(
+              ordered: ordered,
+              allEvidence: ordered,
+              organizeCreatedIds: const {'note', 'voice'},
+              onEvidenceSelected: (item) => selected.add(item.id),
+              onSetContextAnchor: (contextId, capturedId) {
+                anchors.add(
+                  OrganizeContextAnchor(
+                    contextEvidenceId: contextId,
+                    capturedEvidenceId: capturedId,
+                  ),
+                );
+              },
+            ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    await tester.tap(find.byKey(OrganizeWorkspaceView.rowKey('note')));
-    await tester.pump();
+      final note = find.byKey(OrganizeWorkspaceView.rowKey('note'));
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
 
-    expect(selected, ['note']);
-    expect(anchors, isEmpty);
-  });
+      expect(selected, isEmpty);
+      expect(anchors, isEmpty);
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeChronologyCanvas.awaitingPlacementKey('note'),
+              ),
+            )
+            .active,
+        isTrue,
+      );
+
+      await tester.tap(note);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(note);
+      await tester.pump();
+
+      expect(selected, ['note']);
+      expect(anchors, isEmpty);
+
+      await tester.tap(find.byKey(OrganizeWorkspaceView.rowKey('voice')));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(OrganizeWorkspaceView.rowKey('voice')));
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+
+      expect(selected, ['note', 'voice']);
+    },
+  );
+
+  testWidgets(
+    'wobbling appended context: single tap stays; double tap opens once',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+
+      final t0 = DateTime(2026, 8, 22, 10, 42);
+      final ordered = [
+        _item(id: 'photo', kind: WorkspaceEvidenceKind.image, at: t0),
+        _item(
+          id: 'note',
+          kind: WorkspaceEvidenceKind.note,
+          at: t0.add(const Duration(seconds: 15)),
+        ),
+      ];
+      final selected = <String>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrganizeChronologyCanvas(
+              ordered: ordered,
+              allEvidence: ordered,
+              organizeCreatedIds: const {'note'},
+              anchors: const [
+                OrganizeContextAnchor(
+                  contextEvidenceId: 'note',
+                  capturedEvidenceId: 'photo',
+                ),
+              ],
+              onEvidenceSelected: (item) => selected.add(item.id),
+              onSetContextAnchor: (_, _) {},
+              onClearContextAnchor: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final note = find.byKey(OrganizeWorkspaceView.rowKey('note'));
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+
+      expect(selected, isEmpty);
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeChronologyCanvas.awaitingPlacementKey('note'),
+              ),
+            )
+            .active,
+        isTrue,
+      );
+
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+      expect(selected, isEmpty);
+
+      await tester.tap(note);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+
+      expect(selected, ['note']);
+    },
+  );
+
+  testWidgets(
+    'overlay floating context: single tap stays; double tap opens once',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+
+      final t0 = DateTime(2026, 8, 22, 10, 42);
+      final ordered = [
+        _item(id: 'photo', kind: WorkspaceEvidenceKind.image, at: t0),
+        _item(
+          id: 'note',
+          kind: WorkspaceEvidenceKind.note,
+          at: t0.add(const Duration(seconds: 15)),
+        ),
+      ];
+      final selected = <String>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrganizeWorkspaceView(
+              incident: CurrentIncident(
+                id: 'inc-chrono',
+                title: 'Case',
+                status: IncidentStatus.active,
+                createdAt: t0,
+                updatedAt: t0,
+                manuallyComplete: false,
+                journeyStage: JourneyStage.building,
+                captureProgressPercent: 0,
+                timelineAnchorCount: 1,
+                relationshipGroupCount: 0,
+                narrativeEventCount: 0,
+                evidence: ordered,
+                journeyEvidence: ordered,
+                relationshipGroups: const [],
+                evidenceCollections: const [],
+                trustPackageReady: true,
+                trustPackageProgressPercent: 40,
+              ),
+              orderedCapturedEvidenceIds: const ['photo'],
+              organizeCreatedIds: const {'note'},
+              onEvidenceSelected: (item) => selected.add(item.id),
+              onAddOrganizeContext: (_) {},
+              onSetContextAnchor: (_, _) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      final note = find.byKey(OrganizeWorkspaceView.rowKey('note'));
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+      expect(selected, isEmpty);
+
+      await tester.tap(note);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+      expect(selected, ['note']);
+    },
+  );
 
   testWidgets('captured voice, note, and file stay on the fixed spine',
       (tester) async {

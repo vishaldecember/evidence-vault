@@ -195,6 +195,10 @@ class AuthenticationService {
 
   Future<void> signOut() async {
     Sprint6cFileTrace.auth('AuthenticationService.signOut START');
+    // Sign-out policy: clear session, attach intent, and SAF staging.
+    // Do NOT delete evidence_cache / incident library — the same user may
+    // sign back in on this device. Destructive wipe is Clear Vault / Delete
+    // Account only.
     // Remember incident + flush cloud while auth credentials still valid.
     try {
       await WorkspaceSession.instance.flushBeforeSignOut();
@@ -225,7 +229,10 @@ class AuthenticationService {
   }
 
   /// Deletes the Firebase Auth user when available.
-  /// Firestore/Storage cascade remains in a future backend sprint.
+  ///
+  /// Firestore/Storage wipe is attempted earlier by
+  /// [InvestigationDataDeletionService]. Auth deletion does not by itself
+  /// cascade Cloud data.
   Future<void> deleteFirebaseAccount() async {
     if (!FirebaseBootstrap.isAvailable) {
       return;

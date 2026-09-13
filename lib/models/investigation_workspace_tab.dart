@@ -19,7 +19,3 @@ enum InvestigationWorkspaceTab {
         InvestigationWorkspaceTab.reconstruction => 'What happened?',
       };
 }
-
-/// Legacy alias retained for incremental migration.
-@Deprecated('Use InvestigationWorkspaceTab')
-typedef ReconstructionCanvasSegment = InvestigationWorkspaceTab;

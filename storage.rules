@@ -27,6 +27,9 @@ service firebase.storage {
       return request.resource.size < 500 * 1024 * 1024;
     }
 
+    // SDK getDownloadURL() tokens are NOT governed by these match rules.
+    // Anyone holding a download URL can GET the object until the token is
+    // revoked. Prefer authenticated SDK reads; do not treat URLs as auth.
     match /users/{userId}/incidents/{incidentId}/{mediaType}/{fileName} {
       allow read: if isOwner(userId) && allowedMediaType(mediaType);
 

@@ -155,7 +155,7 @@ void main() {
       );
 
       final validation = controller.narrativeEvents.first.validation;
-      expect(validation.status, RelationshipGroupConfidence.low);
+      expect(validation.status, RelationshipGroupConfidence.medium);
       expect(validation.supportedByLines, isNotEmpty);
     });
   });

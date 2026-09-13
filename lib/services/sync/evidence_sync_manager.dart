@@ -34,14 +34,15 @@ typedef EvidenceSyncLifecycleChanged = void Function(
 /// Central dual-lane sync coordinator (Sprint 6B Task 3).
 ///
 /// ```
-/// EvidenceRepository
+/// CaptureEngine
 ///        ↓
 /// EvidenceSyncManager
-///     /        \
-/// FAST_SYNC   INTELLIGENCE
-/// Upload workers   Processing workers
 ///        ↓
-/// Firebase Storage + Firestore
+/// EvidenceSyncQueue  (canonical upload retry owner)
+///        ↓
+/// EvidenceUploadCoordinator  (Storage mechanics + progress only)
+///        ↓
+/// Firebase Storage + Firestore metadata
 /// ```
 ///
 /// Local cache is the immediate source of truth. Firebase is destination only.
@@ -83,6 +84,9 @@ class EvidenceSyncManager extends ChangeNotifier {
   bool _schedulingFast = false;
   bool _schedulingIntel = false;
   bool _online = true;
+  /// When false (Clear Vault / account deletion), in-flight workers must not
+  /// requeue or publish upload success that could recreate evidence.
+  bool _acceptingWork = true;
 
   /// Evidence IDs currently held by a FAST_SYNC worker (duplicate protection).
   final Set<String> _inFlightFast = {};
@@ -139,6 +143,7 @@ class EvidenceSyncManager extends ChangeNotifier {
 
   /// Loads durable queues + pending cache rows and starts worker scheduling.
   Future<void> start() async {
+    _acceptingWork = true;
     if (_started) {
       unawaited(schedule());
       return;
@@ -205,6 +210,7 @@ class EvidenceSyncManager extends ChangeNotifier {
     String? captureSessionId,
     bool kickDrain = true,
   }) async {
+    _acceptingWork = true;
     final userId = UserSessionService.account?.userId ?? '';
     final now = capturedAt.toUtc();
     final mergedMeta = <String, String>{
@@ -393,7 +399,7 @@ class EvidenceSyncManager extends ChangeNotifier {
     _schedulingFast = true;
     try {
       while (true) {
-        if (!_online || _maxConcurrentUploads <= 0) {
+        if (!_acceptingWork || !_online || _maxConcurrentUploads <= 0) {
           break;
         }
         final idle = _workers.where((worker) => worker.isIdle).toList();
@@ -435,14 +441,23 @@ class EvidenceSyncManager extends ChangeNotifier {
     try {
       _log('worker=${worker.id} uploading evidence=${item.evidenceId}');
       final outcome = await _processFastSync(item);
-      if (outcome == _FastSyncOutcome.ownershipRejected) {
+      if (outcome == _FastSyncOutcome.discarded) {
+        // Vault / account wipe — do not requeue or persist cloud success.
+      } else if (outcome == _FastSyncOutcome.ownershipRejected) {
         // Fail closed — restore the original row. Never remap user/incident.
-        await _queue.enqueue(item);
+        if (_acceptingWork) {
+          await _queue.enqueue(item);
+        }
       } else if (outcome == _FastSyncOutcome.retryableFailure) {
         // Independent failure — other workers continue; item re-queued w/ backoff.
-        await _requeueFailed(item);
+        if (_acceptingWork) {
+          await _requeueFailed(item);
+        }
       } else {
         _log('synced evidence=${item.evidenceId}');
+        if (!_acceptingWork) {
+          return;
+        }
         // Intelligence must not block — enqueue async without awaiting lane.
         unawaited(
           enqueueIntelligence(
@@ -455,7 +470,9 @@ class EvidenceSyncManager extends ChangeNotifier {
       }
     } catch (error) {
       _log('failed evidence=${item.evidenceId} error=$error');
-      await _requeueFailed(item);
+      if (_acceptingWork) {
+        await _requeueFailed(item);
+      }
     } finally {
       _inFlightFast.remove(item.evidenceId);
       worker.busy = false;
@@ -466,6 +483,9 @@ class EvidenceSyncManager extends ChangeNotifier {
   }
 
   Future<void> _requeueFailed(EvidenceSyncQueueItem item) async {
+    if (!_acceptingWork) {
+      return;
+    }
     final cached = await LocalEvidenceCache.byId(item.evidenceId);
     final retry = (cached?.retryCount ?? item.attempts) + 1;
     await LocalEvidenceCache.updateStatus(
@@ -506,6 +526,9 @@ class EvidenceSyncManager extends ChangeNotifier {
   }
 
   Future<_FastSyncOutcome> _processFastSync(EvidenceSyncQueueItem item) async {
+    if (!_acceptingWork) {
+      return _FastSyncOutcome.discarded;
+    }
     final currentUserId = UserSessionService.account?.userId ?? '';
     if (!item.isOwnedBy(currentUserId)) {
       _log(
@@ -621,6 +644,9 @@ class EvidenceSyncManager extends ChangeNotifier {
       );
       onLifecycleChanged?.call(item.evidenceId, EvidenceSyncStatus.ready);
 
+      if (!_acceptingWork) {
+        return _FastSyncOutcome.discarded;
+      }
       onUploadSucceeded?.call(
         (await LocalEvidenceCache.byId(item.evidenceId)) ?? cached,
         result,
@@ -670,6 +696,7 @@ class EvidenceSyncManager extends ChangeNotifier {
     if (cached == null) {
       return;
     }
+    _acceptingWork = true;
     await LocalEvidenceCache.updateStatus(
       evidenceId: evidenceId,
       syncStatus: EvidenceSyncStatus.queuedForUpload,
@@ -709,6 +736,8 @@ class EvidenceSyncManager extends ChangeNotifier {
 
   /// Clears in-flight / queued sync work (Clear Vault). Does not touch auth.
   Future<void> clearLocalSyncState() async {
+    _acceptingWork = false;
+    _started = false;
     _schedulingFast = false;
     _schedulingIntel = false;
     _inFlightFast.clear();
@@ -720,11 +749,13 @@ class EvidenceSyncManager extends ChangeNotifier {
       worker.currentEvidenceId = null;
     }
     await _queue.clear();
+    await _uploadCoordinator.clearIndependentRetryState();
   }
 
   @visibleForTesting
   Future<void> resetForTests() async {
     _started = false;
+    _acceptingWork = true;
     _schedulingFast = false;
     _schedulingIntel = false;
     _online = true;
@@ -743,6 +774,7 @@ class EvidenceSyncManager extends ChangeNotifier {
       worker.currentEvidenceId = null;
     }
     await _queue.clear();
+    await _uploadCoordinator.clearIndependentRetryState();
     for (final entry in await LocalEvidenceCache.all()) {
       await LocalEvidenceCache.remove(entry.evidenceId);
     }
@@ -753,4 +785,5 @@ enum _FastSyncOutcome {
   success,
   retryableFailure,
   ownershipRejected,
+  discarded,
 }

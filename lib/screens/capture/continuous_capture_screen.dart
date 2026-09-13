@@ -282,8 +282,13 @@ class _ContinuousCaptureScreenState extends State<ContinuousCaptureScreen> {
     }
     setState(() => _busy = true);
     try {
-      // Always keep an internal ACTIVE session for grouping — invisible to UI.
-      if (_session?.status != CaptureSessionStatus.active) {
+      // Photo/Video/Voice push Cockpit immediately; session persist lives
+      // inside the cockpit route. File/Note still need a session first.
+      final opensCockpit = mode == WorkspaceCaptureMode.photo ||
+          mode == WorkspaceCaptureMode.video ||
+          mode == WorkspaceCaptureMode.voice;
+      if (!opensCockpit &&
+          _session?.status != CaptureSessionStatus.active) {
         await _ensureInternalSession();
       }
       // File attach continues even if this State was disposed during session

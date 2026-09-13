@@ -9,9 +9,9 @@ import 'evidence_upload_models.dart';
 
 /// Locally queued failed (or pending) Firebase Storage uploads.
 ///
-/// Evidence stays in the incident store; this queue only tracks retry work.
-/// Backed by [DurableUploadQueue] (Sprint 4D) so retryable uploads survive an
-/// app restart — enqueue / remove persist automatically.
+/// **Phase 2(B)-1 — quarantined.** Live capture retries are owned by
+/// [EvidenceSyncQueue]. This façade remains so leftover durable rows can be
+/// cleared; production upload failure must not enqueue here.
 class EvidenceUploadQueue extends ChangeNotifier {
   EvidenceUploadQueue({DurableUploadQueue? durable})
       : _durable = durable ?? DurableUploadQueue();
@@ -72,6 +72,14 @@ class EvidenceUploadQueue extends ChangeNotifier {
       }
     }
     return null;
+  }
+
+  /// Drops in-memory and persisted leftover rows (Clear Vault / account delete).
+  Future<void> clear() async {
+    _items.clear();
+    _loaded = false;
+    notifyListeners();
+    await _durable.clear();
   }
 
   /// Durably persists the current queue snapshot. Retained for callers that

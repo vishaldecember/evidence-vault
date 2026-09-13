@@ -813,4 +813,102 @@ void main() {
     expect(restarted.active, isTrue);
     expect(restarted.restartToken, 'voice-org');
   });
+
+  testWidgets(
+    'tapping a snapped context wobbles the instruction immediately',
+    (tester) async {
+      final note = _item(
+        id: 'note-org',
+        kind: WorkspaceEvidenceKind.note,
+        at: t0.add(const Duration(seconds: 20)),
+      );
+      final voice = _item(
+        id: 'voice-org',
+        kind: WorkspaceEvidenceKind.voice,
+        at: t0.add(const Duration(seconds: 30)),
+      );
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrganizeWorkspaceView(
+              incident: _incident(evidence: [photo, video, note, voice]),
+              orderedCapturedEvidenceIds: const ['photo', 'video'],
+              organizeCreatedIds: const {'note-org', 'voice-org'},
+              contextAnchors: const [
+                OrganizeContextAnchor(
+                  contextEvidenceId: 'note-org',
+                  capturedEvidenceId: 'photo',
+                ),
+                OrganizeContextAnchor(
+                  contextEvidenceId: 'voice-org',
+                  capturedEvidenceId: 'video',
+                ),
+              ],
+              onEvidenceSelected: (_) {},
+              onAddOrganizeContext: (_) {},
+              onSetContextAnchor: (_, _) {},
+              onClearContextAnchor: (_) {},
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
+
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeWorkspaceView.addContextInstructionWobbleKey,
+              ),
+            )
+            .active,
+        isFalse,
+      );
+
+      await tester.tap(
+        find.byKey(OrganizeChronologyCanvas.contextTileKey('note-org')),
+      );
+      await tester.pump();
+
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeChronologyCanvas.awaitingPlacementKey('note-org'),
+              ),
+            )
+            .active,
+        isTrue,
+      );
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeWorkspaceView.addContextInstructionWobbleKey,
+              ),
+            )
+            .active,
+        isTrue,
+      );
+
+      await tester.tap(
+        find.byKey(OrganizeChronologyCanvas.contextTileKey('voice-org')),
+      );
+      await tester.pump();
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeWorkspaceView.addContextInstructionWobbleKey,
+              ),
+            )
+            .active,
+        isTrue,
+      );
+    },
+  );
 }

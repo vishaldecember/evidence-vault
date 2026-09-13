@@ -13,6 +13,7 @@ WorkspaceEvidenceItem _item({
   bool isContextual = false,
   String? notePreview,
   Set<String> relatedEvidenceIds = const {},
+  String? deviceModel,
 }) {
   return WorkspaceEvidenceItem(
     id: id,
@@ -24,6 +25,7 @@ WorkspaceEvidenceItem _item({
     isContextual: isContextual,
     notePreview: notePreview,
     relatedEvidenceIds: relatedEvidenceIds,
+    deviceModel: deviceModel,
   );
 }
 
@@ -114,7 +116,10 @@ void main() {
     test('evidence appendix references evidence without duplicating media fields', () {
       final controller = WorkspaceEvidenceController(
         initialState: WorkspaceEvidenceState(
-          items: [_item(id: 'photo'), _item(id: 'video')],
+          items: [
+            _item(id: 'photo', deviceModel: 'Pixel Test'),
+            _item(id: 'video', deviceModel: 'Pixel Test'),
+          ],
         ),
       );
       controller.commitRelationshipGroup(evidenceIds: ['photo', 'video']);

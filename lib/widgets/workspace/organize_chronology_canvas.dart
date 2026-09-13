@@ -59,6 +59,7 @@ class OrganizeChronologyCanvas extends StatefulWidget {
     this.onGroupCloneDragEnded,
     this.onRemoveGroupClone,
     this.onWorkspaceDismiss,
+    this.onWobblingContextIdsChanged,
   });
 
   final List<WorkspaceEvidenceItem> ordered;
@@ -90,6 +91,10 @@ class OrganizeChronologyCanvas extends StatefulWidget {
   final VoidCallback? onGroupCloneDragEnded;
   final ValueChanged<String>? onRemoveGroupClone;
   final VoidCallback? onWorkspaceDismiss;
+
+  /// Appended contexts currently in the wobbling/floating placement state.
+  /// Unsnapped overlay contexts wobble independently and are not listed here.
+  final ValueChanged<Set<String>>? onWobblingContextIdsChanged;
 
   static const Key canvasKey = Key('organize_chronology_canvas');
   static const Key fixedSpineKey = Key('organize_fixed_spine');
@@ -416,11 +421,18 @@ class OrganizeChronologyCanvasState extends State<OrganizeChronologyCanvas> {
     ];
   }
 
+  void _publishWobblingContextIds() {
+    widget.onWobblingContextIdsChanged?.call(
+      Set<String>.of(_wobblingContextIds),
+    );
+  }
+
   void _discardFloatingContext(String contextId) {
     setState(() {
       _discardedContextIds.add(contextId);
       _wobblingContextIds.remove(contextId);
     });
+    _publishWobblingContextIds();
     widget.onDiscardUnsnapped?.call(contextId);
   }
 
@@ -494,6 +506,7 @@ class OrganizeChronologyCanvasState extends State<OrganizeChronologyCanvas> {
     setState(() {
       _wobblingContextIds.add(contextId);
     });
+    _publishWobblingContextIds();
   }
 
   void _onContextPointerDown(Offset global) {
@@ -662,6 +675,7 @@ class OrganizeChronologyCanvasState extends State<OrganizeChronologyCanvas> {
         _wobblingContextIds.add(contextId);
       }
     });
+    _publishWobblingContextIds();
     if (!willSnap) {
       if (hadAnchor) {
         widget.onClearContextAnchor?.call(contextId);
@@ -1199,7 +1213,7 @@ class _FloatingContextLayer extends StatelessWidget {
   }
 }
 
-class OrganizeUnsnappedContextObject extends StatelessWidget {
+class OrganizeUnsnappedContextObject extends StatefulWidget {
   const OrganizeUnsnappedContextObject({
     super.key,
     required this.item,
@@ -1237,40 +1251,58 @@ class OrganizeUnsnappedContextObject extends StatelessWidget {
   final ValueChanged<String> onContextDragEnd;
   final ValueChanged<String>? onDiscardUnsnapped;
 
+  @override
+  State<OrganizeUnsnappedContextObject> createState() =>
+      _OrganizeUnsnappedContextObjectState();
+}
+
+class _OrganizeUnsnappedContextObjectState
+    extends State<OrganizeUnsnappedContextObject> {
+  bool _openQueued = false;
+
   void _onTap() {
-    if (linked && !wobbling) {
-      onArmWobble?.call();
+    if (widget.linked && !widget.wobbling) {
+      widget.onArmWobble?.call();
+    }
+  }
+
+  void _onDoubleTap() {
+    if (!widget.wobbling || _openQueued) {
       return;
     }
-    if (linked && wobbling) {
-      return;
-    }
-    onEvidenceSelected(item);
+    _openQueued = true;
+    widget.onEvidenceSelected(widget.item);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _openQueued = false;
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     Widget tile = OrganizePlacementWobble(
-      key: OrganizeChronologyCanvas.awaitingPlacementKey(item.id),
-      active: wobbling && placementEnabled,
+      key: OrganizeChronologyCanvas.awaitingPlacementKey(widget.item.id),
+      active: widget.wobbling && widget.placementEnabled,
       child: _ChronologyTile(
-        item: item,
-        allEvidence: allEvidence,
-        anchoredAtByEvidenceId: anchoredAtByEvidenceId,
-        tileKey: OrganizeChronologyCanvas.contextTileKey(item.id),
+        item: widget.item,
+        allEvidence: widget.allEvidence,
+        anchoredAtByEvidenceId: widget.anchoredAtByEvidenceId,
+        tileKey: OrganizeChronologyCanvas.contextTileKey(widget.item.id),
         isAddedContext: true,
-        draggable: wobbling && placementEnabled,
-        confirming: confirming,
-        onTap: _onTap,
-        onPointerDown: onContextPointerDown,
-        onPointerMove: onContextPointerMove,
-        onPointerUp: onContextPointerUp,
-        onDragStarted: onContextDragStarted,
-        onDragUpdate: onContextDragUpdate,
-        onDragEnd: () => onContextDragEnd(item.id),
+        draggable: widget.wobbling && widget.placementEnabled,
+        confirming: widget.confirming,
+        onTap: widget.linked && !widget.wobbling ? _onTap : null,
+        onDoubleTap: widget.wobbling ? _onDoubleTap : null,
+        onPointerDown: widget.onContextPointerDown,
+        onPointerMove: widget.onContextPointerMove,
+        onPointerUp: widget.onContextPointerUp,
+        onDragStarted: widget.onContextDragStarted,
+        onDragUpdate: widget.onContextDragUpdate,
+        onDragEnd: () => widget.onContextDragEnd(widget.item.id),
       ),
     );
-    if (wobbling) {
+    if (widget.wobbling) {
       tile = Stack(
         clipBehavior: Clip.none,
         children: [
@@ -1280,7 +1312,7 @@ class OrganizeUnsnappedContextObject extends StatelessWidget {
               top: OrganizeFloatingContextLayout.removeControlOutset,
             ),
             child: KeyedSubtree(
-              key: OrganizeChronologyCanvas.contextFrameKey(item.id),
+              key: OrganizeChronologyCanvas.contextFrameKey(widget.item.id),
               child: tile,
             ),
           ),
@@ -1288,15 +1320,15 @@ class OrganizeUnsnappedContextObject extends StatelessWidget {
             left: 0,
             top: 0,
             child: _ContextDiscardAffordance(
-              evidenceId: item.id,
-              onPressed: onDiscardUnsnapped == null
+              evidenceId: widget.item.id,
+              onPressed: widget.onDiscardUnsnapped == null
                   ? null
                   : () async {
                       final confirmed = await showOrganizeContextDeleteDialog(
                         context,
                       );
                       if (confirmed) {
-                        onDiscardUnsnapped!(item.id);
+                        widget.onDiscardUnsnapped!(widget.item.id);
                       }
                     },
             ),
@@ -1313,6 +1345,7 @@ class _ChronologyTile extends StatelessWidget {
     required this.item,
     required this.allEvidence,
     this.onTap,
+    this.onDoubleTap,
     required this.tileKey,
     this.anchoredAtByEvidenceId = const {},
     this.isAddedContext = false,
@@ -1330,6 +1363,7 @@ class _ChronologyTile extends StatelessWidget {
   final List<WorkspaceEvidenceItem> allEvidence;
   final Map<String, DateTime> anchoredAtByEvidenceId;
   final VoidCallback? onTap;
+  final VoidCallback? onDoubleTap;
   final Key tileKey;
   final bool isAddedContext;
   final bool draggable;
@@ -1399,6 +1433,7 @@ class _ChronologyTile extends StatelessWidget {
           child: InkWell(
             key: OrganizeWorkspaceView.rowKey(item.id),
             onTap: onTap,
+            onDoubleTap: onDoubleTap,
             borderRadius: BorderRadius.circular(AppSpacing.sm),
             child: SizedBox(
               width: JourneyEvidenceThumbnail.size,
@@ -1408,7 +1443,7 @@ class _ChronologyTile extends StatelessWidget {
                 children: [
                   JourneyEvidenceThumbnail(
                     item: item,
-                    onTap: onTap,
+                    onTap: onDoubleTap == null ? onTap : null,
                     identifyingTextColor:
                         OrganizeEvidenceTypography.thumbnailText,
                   ),
@@ -1776,6 +1811,12 @@ class _OrganizePlacementWobbleState extends State<OrganizePlacementWobble>
       vsync: this,
       duration: OrganizePlacementWobble.cycle,
     );
+    _sync();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
     _sync();
   }
 

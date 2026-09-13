@@ -18,13 +18,17 @@ class ReconstructionLocationBand {
     required this.key,
     required this.label,
     required this.y,
-    required this.editable,
+    this.latitude,
+    this.longitude,
   });
 
   final String key;
   final String label;
   final double y;
-  final bool editable;
+  final double? latitude;
+  final double? longitude;
+
+  bool get hasCoordinates => latitude != null && longitude != null;
 }
 
 class ReconstructionTimeMark {
@@ -112,7 +116,7 @@ abstract final class ReconstructionCanvasLayout {
   static const double rowPitch = 48;
   static const double minNodeGap = 38;
   static const String unknownKey = 'unknown';
-  static const String addLocationLabel = 'Add location';
+  static const String locationUnavailableLabel = 'Location unavailable';
   static const Size defaultViewport = Size(390, 844);
 
   static double fingerGapFor(Size viewport) {
@@ -131,7 +135,6 @@ abstract final class ReconstructionCanvasLayout {
     List<EvidenceCollection> collections = const [],
     Set<String> organizeCreatedIds = const {},
     List<OrganizeContextAnchor> contextAnchors = const [],
-    Map<String, String> locationLabels = const {},
     Size viewport = defaultViewport,
   }) {
     final finger = fingerGapFor(viewport);
@@ -172,7 +175,6 @@ abstract final class ReconstructionCanvasLayout {
       locationOf[moment.id] = _locationFor(
         moment,
         collections: collections,
-        labels: locationLabels,
       );
     }
 
@@ -333,9 +335,10 @@ abstract final class ReconstructionCanvasLayout {
       for (final key in bandKeys)
         ReconstructionLocationBand(
           key: key,
-          label: _bandLabel(key, locationOf, locationLabels),
+          label: _bandLabel(key, locationOf),
           y: yFor(key),
-          editable: true,
+          latitude: _bandSource(key, locationOf, moments)?.latitude,
+          longitude: _bandSource(key, locationOf, moments)?.longitude,
         ),
     ];
 
@@ -422,22 +425,21 @@ abstract final class ReconstructionCanvasLayout {
   static _Loc _locationFor(
     WorkspaceEvidenceItem item, {
     required List<EvidenceCollection> collections,
-    required Map<String, String> labels,
   }) {
-    for (final collection in collections) {
-      if (collection.category != 'location') {
-        continue;
-      }
-      final name = collection.name.trim();
-      if (name.isEmpty) {
-        continue;
-      }
-      if (!collection.memberEvidenceIds.contains(item.id)) {
-        continue;
-      }
-      return _Loc(key: 'loc:${collection.id}', label: name);
-    }
     if (EvidenceSemantics.hasLocation(item)) {
+      for (final collection in collections) {
+        if (collection.category != 'location') {
+          continue;
+        }
+        final name = collection.name.trim();
+        if (name.isEmpty) {
+          continue;
+        }
+        if (!collection.memberEvidenceIds.contains(item.id)) {
+          continue;
+        }
+        return _Loc(key: 'loc:${collection.id}', label: name);
+      }
       final lat = item.latitude!;
       final lng = item.longitude!;
       return _Loc(
@@ -445,29 +447,37 @@ abstract final class ReconstructionCanvasLayout {
         label: coordinateLabel(lat, lng),
       );
     }
-    final custom = labels[unknownKey]?.trim() ?? '';
-    return _Loc(
+    return const _Loc(
       key: unknownKey,
-      label: custom.isEmpty ? addLocationLabel : custom,
+      label: locationUnavailableLabel,
     );
   }
 
-  static String _bandLabel(
+  static WorkspaceEvidenceItem? _bandSource(
     String key,
     Map<String, _Loc> locationOf,
-    Map<String, String> labels,
+    List<WorkspaceEvidenceItem> moments,
   ) {
-    final override = labels[key]?.trim();
-    if (override != null && override.isNotEmpty) {
-      return override;
+    for (final moment in moments) {
+      final loc = locationOf[moment.id];
+      if (loc == null || loc.key != key) {
+        continue;
+      }
+      if (EvidenceSemantics.hasLocation(moment)) {
+        return moment;
+      }
     }
+    return null;
+  }
+
+  static String _bandLabel(String key, Map<String, _Loc> locationOf) {
     for (final loc in locationOf.values) {
       if (loc.key == key) {
         return loc.label;
       }
     }
     if (key == unknownKey) {
-      return addLocationLabel;
+      return locationUnavailableLabel;
     }
     return key;
   }

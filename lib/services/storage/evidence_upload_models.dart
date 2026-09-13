@@ -72,23 +72,27 @@ class EvidenceUploadProgress {
       };
 }
 
-/// Debug logging for Storage uploads.
+/// Debug logging for Storage uploads. Release builds omit paths (uid/incident).
 abstract final class StorageUploadLog {
   static void started(String storagePath) {
-    debugPrint('[Storage] upload started → $storagePath');
+    _log('[Storage] upload started → $storagePath');
   }
 
   static void completed(String storagePath) {
-    debugPrint('[Storage] upload completed → $storagePath');
+    _log('[Storage] upload completed → $storagePath');
   }
 
   static void failed(String storagePath, Object error) {
-    debugPrint('[Storage] upload failed → $storagePath | $error');
+    _log('[Storage] upload failed → $storagePath | $error');
   }
 
   static void queued(String evidenceId, String storagePath) {
-    debugPrint(
-      '[Storage] queued retry → evidence=$evidenceId path=$storagePath',
-    );
+    _log('[Storage] queued retry → evidence=$evidenceId path=$storagePath');
+  }
+
+  static void _log(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
   }
 }

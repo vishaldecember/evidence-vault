@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../models/evidence_artifact_model.dart';
+import '../../security/https_preview_url.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_text_styles.dart';
@@ -283,10 +284,7 @@ class _CachedMediaImage extends StatelessWidget {
   final String imagePath;
   final Widget fallback;
 
-  static bool _isNetworkUrl(String path) {
-    final lower = path.toLowerCase();
-    return lower.startsWith('http://') || lower.startsWith('https://');
-  }
+  static bool _isNetworkUrl(String path) => isHttpsPreviewUrl(path);
 
   @override
   Widget build(BuildContext context) {

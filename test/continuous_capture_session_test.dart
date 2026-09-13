@@ -11,7 +11,14 @@ void main() {
   late WorkspaceEvidenceController controller;
 
   setUp(() {
+    ContinuousCaptureSession.debugGenerateVideoThumbnail = null;
+    ContinuousCaptureSession.debugLastAttachedVideoThumbnail = null;
     controller = WorkspaceEvidenceController();
+  });
+
+  tearDown(() {
+    ContinuousCaptureSession.debugGenerateVideoThumbnail = null;
+    ContinuousCaptureSession.debugLastAttachedVideoThumbnail = null;
   });
 
   Future<void> pumpSession(

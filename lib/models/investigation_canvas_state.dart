@@ -18,9 +18,6 @@ class InvestigationCanvasState {
   /// Inspector target — derived from evidence taps, not a fourth sync axis.
   final String? selectedEvidenceId;
 
-  @Deprecated('Use activeTab')
-  InvestigationWorkspaceTab get activeSegment => activeTab;
-
   InvestigationCanvasState copyWith({
     InvestigationWorkspaceTab? activeTab,
     String? selectedTimelineAnchorId,

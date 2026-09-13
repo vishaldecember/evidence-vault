@@ -119,7 +119,7 @@ class _SplashScreenState extends State<SplashScreen> {
                           ),
                         ),
                         child: const Text(
-                          'Evidence Vault helps you preserve, enrich, and understand '
+                          'My Truth helps you preserve, enrich, and understand '
                           'the moments that matter—building your Library of Truth over time.',
                           textAlign: TextAlign.center,
                           style: TextStyle(

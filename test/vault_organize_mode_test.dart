@@ -1,5 +1,6 @@
 import 'package:evidence_vault/models/library_incident_summary.dart';
 import 'package:evidence_vault/screens/vault_screen.dart';
+import 'package:evidence_vault/services/memory/memory_recall_service.dart';
 import 'package:evidence_vault/services/persistence/incident_library_service.dart';
 import 'package:evidence_vault/services/vault/incident_collection_store.dart';
 import 'package:evidence_vault/widgets/home/library_incident_summary_tile.dart';
@@ -8,6 +9,11 @@ import 'package:evidence_vault/widgets/vault/vault_organize_module.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// Proven green-baseline clock from vault_recall_date_diagnostic_test.
+/// Keeps the Aug 20–21 fixtures inside the 14-day first-incident window
+/// so Memory Recall uses "Review Incident" (fits) not "View Investigation".
+final _recallNow = DateTime.utc(2026, 8, 31, 23, 44, 42);
 
 LibraryIncidentSummary _incident({
   required String id,
@@ -35,11 +41,13 @@ void main() {
     SharedPreferences.setMockInitialValues({});
     IncidentLibraryService.instance.clear();
     IncidentCollectionStore.instance.debugReset();
+    MemoryRecallService.instance.resetForTests();
   });
 
   tearDown(() {
     IncidentLibraryService.instance.clear();
     IncidentCollectionStore.instance.debugReset();
+    MemoryRecallService.instance.resetForTests();
   });
 
   Future<void> pumpVault(
@@ -49,7 +57,9 @@ void main() {
   }) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.binding.setSurfaceSize(const Size(412, 915));
-    IncidentLibraryService.instance.summaries = incidents;
+    // Always start empty so no test can pre-seed the library before
+    // VaultScreen.initState's DateTime.now() refresh paints recall.
+    IncidentLibraryService.instance.summaries = const [];
     await tester.pumpWidget(
       MaterialApp(
         home: VaultScreen(
@@ -59,6 +69,14 @@ void main() {
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 50));
+    // Drain initState's unawaited wall-clock refresh while the library
+    // is still empty, then pin now before the first incident paint.
+    await MemoryRecallService.instance.refresh(now: _recallNow);
+    IncidentLibraryService.instance.summaries = incidents;
+    await MemoryRecallService.instance.refresh(now: _recallNow);
+    await tester.pump();
+    await MemoryRecallService.instance.refresh(now: _recallNow);
+    await tester.pump();
   }
 
   Finder tileTitle(String title) {
@@ -145,7 +163,6 @@ void main() {
   testWidgets('minus affordance exits organize and does not write data',
       (tester) async {
     final incident = _incident(id: 'incident-a', title: 'Street Fight');
-    IncidentLibraryService.instance.summaries = [incident];
     final opened = <LibraryIncidentSummary>[];
     await pumpVault(
       tester,

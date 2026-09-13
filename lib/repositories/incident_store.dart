@@ -95,4 +95,25 @@ class IncidentStore {
 
   /// Pending / accepted relationship suggestions (Sprint 5C) — local first.
   final List<RelationshipSuggestion> relationshipSuggestions;
+
+  /// Independent snapshot for transactional rollback. List contents are copied;
+  /// evidence objects remain shared until a later mutation replaces them.
+  IncidentStore copy() {
+    return IncidentStore(
+      incident: incident,
+      capturedEvidence: capturedEvidence,
+      supportingEvidence: supportingEvidence,
+      timelineAnchors: timelineAnchors,
+      relationshipGroups: relationshipGroups,
+      relationships: relationships,
+      reconstructionNotes: reconstructionNotes,
+      narrativeEvents: narrativeEvents,
+      participants: participants,
+      evidenceCollections: evidenceCollections,
+      relationshipSuggestions: relationshipSuggestions,
+      dismissedCollectionIds: dismissedCollectionIds,
+      organizeContextAnchors: organizeContextAnchors,
+      organizeCreatedEvidenceIds: organizeCreatedEvidenceIds,
+    );
+  }
 }

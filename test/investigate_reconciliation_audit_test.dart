@@ -21,7 +21,6 @@ import 'package:evidence_vault/widgets/evidence_inspector/renderers/video_eviden
 import 'package:evidence_vault/widgets/evidence_inspector/renderers/voice_evidence_renderer.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_evidence_inspector_modal.dart';
 import 'package:evidence_vault/widgets/reconstruction/evidence_inspector_panel.dart';
-import 'package:evidence_vault/widgets/workspace/evidence_detail_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -234,7 +233,6 @@ void main() {
       expect(find.byType(InvestigationEvidenceInspectorModal), findsOneWidget);
       expect(find.text('Evidence Inspector'), findsOneWidget);
       expect(find.byType(EvidenceInspectorPanel), findsNothing);
-      expect(find.byType(EvidenceDetailSheet), findsNothing);
       expectIncident(incidentId, controller.currentIncident.id);
       expect(
         evidenceInspectorOrder(

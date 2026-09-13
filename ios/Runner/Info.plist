@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Evidence Vault</string>
+	<string>My Truth</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -52,13 +52,13 @@
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>NSCameraUsageDescription</key>
-	<string>Evidence Vault needs camera access to capture photo and video evidence.</string>
+	<string>My Truth needs camera access to capture photo and video evidence.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>Evidence Vault needs microphone access to record audio and video evidence.</string>
+	<string>My Truth needs microphone access to record audio and video evidence.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Evidence Vault needs photo library access to import documents and images.</string>
+	<string>My Truth needs photo library access to import documents and images.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Evidence Vault captures location metadata with each evidence item.</string>
+	<string>My Truth captures location metadata with each evidence item.</string>
 	<key>UIMainStoryboardFile</key>
 	<string>Main</string>
 	<key>UISupportedInterfaceOrientations</key>

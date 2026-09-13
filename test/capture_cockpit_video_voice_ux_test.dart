@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:evidence_vault/controllers/workspace_session.dart';
@@ -48,10 +49,12 @@ void main() {
       userId: 'user-12b',
     );
     ContinuousCaptureSession.debugFailVoiceDurability = false;
+    ContinuousCaptureSession.debugFailLocalCommit = false;
   }
 
   Future<void> cleanupEnv() async {
     ContinuousCaptureSession.debugFailVoiceDurability = false;
+    ContinuousCaptureSession.debugFailLocalCommit = false;
     await EvidenceSyncManager.instance.resetForTests();
     await manager.resetForTests();
     LocalEvidenceCache.resetForTests();
@@ -217,6 +220,48 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
 
       expect(controller.currentIncident.evidenceCount, 0);
+    },
+  );
+
+  testWidgets(
+    'video DONE while recording finalizes one Preview, then Accept',
+    (tester) async {
+      final delayed = Completer<String?>();
+      ContinuousCaptureSession.debugGenerateVideoThumbnail =
+          (_) => delayed.future;
+      addTearDown(() {
+        ContinuousCaptureSession.debugGenerateVideoThumbnail = null;
+        ContinuousCaptureSession.debugLastAttachedVideoThumbnail = null;
+      });
+
+      final controller = WorkspaceSession.instance.controller;
+      final incidentId = controller.currentIncident.id;
+      await pumpCockpit(tester, WorkspaceCaptureMode.video);
+
+      await tester.tap(find.byKey(const Key('video_record')));
+      await tester.pump();
+      expect(find.byKey(const Key('video_stop')), findsOneWidget);
+      expect(controller.currentIncident.evidenceCount, 0);
+
+      await tester.tap(find.byKey(const Key('capture_cockpit_done')));
+      await tester.pump();
+
+      expect(find.byKey(const Key('capture_cockpit_screen')), findsOneWidget);
+      expect(find.byKey(const Key('capture_preview_accept')), findsOneWidget);
+      expect(find.byKey(const Key('capture_video_preview_play')), findsOneWidget);
+      expect(controller.currentIncident.evidenceCount, 0);
+      expect(controller.currentIncident.id, incidentId);
+      expect(ContinuousCaptureSession.debugLastAttachedVideoThumbnail, isNull);
+
+      delayed.complete('test://thumb-done');
+      await tester.pump();
+
+      await tester.tap(find.byKey(const Key('capture_preview_accept')));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(controller.currentIncident.evidenceCount, 1);
+      expect(controller.currentIncident.id, incidentId);
     },
   );
 

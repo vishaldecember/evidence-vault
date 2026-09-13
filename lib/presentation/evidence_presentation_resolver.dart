@@ -1,6 +1,7 @@
 import '../models/evidence_artifact_model.dart';
 import '../models/evidence_record_model.dart';
 import '../models/workspace_evidence_item.dart';
+import '../security/https_preview_url.dart';
 import '../services/storage/file_attachment_classifier.dart';
 import '../widgets/evidence_inspector/evidence_preview_renderer.dart';
 
@@ -162,8 +163,5 @@ abstract final class EvidencePresentationResolver {
         lower.endsWith('.heic');
   }
 
-  static bool _isNetworkUrl(String path) {
-    final lower = path.toLowerCase();
-    return lower.startsWith('http://') || lower.startsWith('https://');
-  }
+  static bool _isNetworkUrl(String path) => isHttpsPreviewUrl(path);
 }

@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:path/path.dart' as p;
 
@@ -73,6 +74,9 @@ abstract final class FileFinalTrace {
     if (extra != null && extra.isNotEmpty) {
       parts.add(extra);
     }
+    if (!kDebugMode) {
+      return;
+    }
     final line = '[FILEFINAL] STEP=$step ${parts.join(' ')}';
     debugPrint(line);
     debugPrint(line.replaceFirst('[FILEFINAL]', '[FILEP0]'));
@@ -115,6 +119,9 @@ abstract final class FileFinalTrace {
     }
     if (extra != null) {
       parts.add(extra);
+    }
+    if (!kDebugMode) {
+      return;
     }
     final line = '[FILEFINAL] FILE_FAILURE=$stage ${parts.join(' ')}';
     debugPrint(line);

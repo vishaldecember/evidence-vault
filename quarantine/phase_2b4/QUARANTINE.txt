@@ -1,0 +1,12 @@
+Phase 2(B)-4 quarantine — do not delete these files.
+
+Moved out of lib/ so they are not part of the production source graph.
+Rollback: git mv each file back to the path listed below.
+
+lib/screens/capture/photo_capture_screen.dart
+lib/screens/capture/video_capture_screen.dart
+lib/screens/capture/audio_recording_screen.dart
+lib/screens/evidence_preview_screen.dart
+lib/screens/capture/document_import_screen.dart
+lib/services/capture/upload_job.dart
+lib/services/reconstruction_canvas_sync_service.dart

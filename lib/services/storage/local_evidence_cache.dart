@@ -14,6 +14,8 @@ import 'capture_media_service.dart';
 /// Durable local evidence cache — media binaries + metadata index (Sprint 6B).
 ///
 /// **Capture is local. Sync is background.**
+/// Files are plaintext. At-rest encryption is deferred because encrypting
+/// this cache would break SAF recovery and local playback.
 ///
 /// Media: `documents/evidence_cache/{incidentId}/{evidenceId}.*`
 /// Metadata index: `documents/evidence_cache/metadata_index.json`

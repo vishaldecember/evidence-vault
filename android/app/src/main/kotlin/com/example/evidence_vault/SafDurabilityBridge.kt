@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
-import android.util.Log
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
@@ -24,7 +23,7 @@ class SafDurabilityBridge(
 
     fun register(messenger: BinaryMessenger) {
         channel = MethodChannel(messenger, CHANNEL).also { it.setMethodCallHandler(this) }
-        Log.i(SafStagingStore.TAG, "CHANNEL_REGISTERED name=$CHANNEL")
+        EvLog.i(SafStagingStore.TAG, "CHANNEL_REGISTERED name=$CHANNEL")
     }
 
     override fun onMethodCall(call: io.flutter.plugin.common.MethodCall, result: MethodChannel.Result) {
@@ -71,32 +70,32 @@ class SafDurabilityBridge(
         fun onHostActivityResult(activity: Activity, resultCode: Int, data: Intent?) {
             SafStagingStore.sweepStale(activity)
             if (resultCode != Activity.RESULT_OK) {
-                Log.i(SafStagingStore.TAG, "RESULT_IGNORE resultCode=$resultCode")
+                EvLog.i(SafStagingStore.TAG, "RESULT_IGNORE resultCode=$resultCode")
                 return
             }
             val uri = data?.data
             if (uri == null) {
-                Log.i(SafStagingStore.TAG, "RESULT_IGNORE reason=no_uri")
+                EvLog.i(SafStagingStore.TAG, "RESULT_IGNORE reason=no_uri")
                 return
             }
             if (!isAcceptedUri(activity, uri)) {
-                Log.w(SafStagingStore.TAG, "RESULT_REJECT scheme=${uri.scheme} uri=$uri")
+                EvLog.w(SafStagingStore.TAG, "RESULT_REJECT scheme=${uri.scheme} uri=$uri")
                 return
             }
             val pending = readPendingIntent(activity)
             if (pending == null) {
-                Log.i(SafStagingStore.TAG, "RESULT_SKIP no_pending_intent uri=$uri")
+                EvLog.i(SafStagingStore.TAG, "RESULT_SKIP no_pending_intent uri=$uri")
                 return
             }
             val operationId = SafStagingStore.sanitizeOperationId(pending.optString("operationId"))
             if (operationId == null) {
-                Log.w(SafStagingStore.TAG, "RESULT_SKIP invalid_operationId")
+                EvLog.w(SafStagingStore.TAG, "RESULT_SKIP invalid_operationId")
                 return
             }
             val persistable = takeReadPermissionBestEffort(activity, data, uri)
             val fileName = SafStagingStore.sanitizeDisplayName(queryDisplayName(activity, uri))
             val mimeType = activity.contentResolver.getType(uri)
-            Log.i(
+            EvLog.i(
                 SafStagingStore.TAG,
                 "RESULT_OK operationId=$operationId persistable=$persistable " +
                     "fileName=$fileName mime=$mimeType uri=$uri",
@@ -125,13 +124,13 @@ class SafDurabilityBridge(
             }
             val meta = SafStagingStore.readMeta(context, id)
             val status = meta?.optString("status") ?: "none"
-            Log.i(SafStagingStore.TAG, "GET_ARTIFACT operationId=$id status=$status complete=false")
+            EvLog.i(SafStagingStore.TAG, "GET_ARTIFACT operationId=$id status=$status complete=false")
             return null
         }
 
         private fun artifactMap(meta: JSONObject?): Map<String, Any?>? {
             if (meta == null) return null
-            Log.i(
+            EvLog.i(
                 SafStagingStore.TAG,
                 "GET_ARTIFACT operationId=${meta.optString("operationId")} status=complete " +
                     "size=${meta.optLong("size")} path=${meta.optString("path")}",
@@ -163,23 +162,23 @@ class SafDurabilityBridge(
                 val offered = (data.flags and Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0
                 if (offered) {
                     activity.contentResolver.takePersistableUriPermission(uri, flags)
-                    Log.i(SafStagingStore.TAG, "PERSISTABLE_URI_TAKEN uri=$uri")
+                    EvLog.i(SafStagingStore.TAG, "PERSISTABLE_URI_TAKEN uri=$uri")
                     true
                 } else {
                     try {
                         activity.contentResolver.takePersistableUriPermission(uri, flags)
-                        Log.i(SafStagingStore.TAG, "PERSISTABLE_URI_TAKEN_UNFLAGGED uri=$uri")
+                        EvLog.i(SafStagingStore.TAG, "PERSISTABLE_URI_TAKEN_UNFLAGGED uri=$uri")
                         true
                     } catch (_: SecurityException) {
-                        Log.i(SafStagingStore.TAG, "PERSISTABLE_URI_UNAVAILABLE uri=$uri")
+                        EvLog.i(SafStagingStore.TAG, "PERSISTABLE_URI_UNAVAILABLE uri=$uri")
                         false
                     }
                 }
             } catch (error: SecurityException) {
-                Log.i(SafStagingStore.TAG, "PERSISTABLE_URI_DENIED uri=$uri ${error.message}")
+                EvLog.i(SafStagingStore.TAG, "PERSISTABLE_URI_DENIED uri=$uri ${error.message}")
                 false
             } catch (error: Exception) {
-                Log.w(SafStagingStore.TAG, "PERSISTABLE_URI_ERROR uri=$uri", error)
+                EvLog.w(SafStagingStore.TAG, "PERSISTABLE_URI_ERROR uri=$uri", error)
                 false
             }
         }
@@ -203,7 +202,7 @@ class SafDurabilityBridge(
                         }
                     }
                 } catch (error: Exception) {
-                    Log.w(SafStagingStore.TAG, "DISPLAY_NAME_QUERY_FAILED", error)
+                    EvLog.w(SafStagingStore.TAG, "DISPLAY_NAME_QUERY_FAILED", error)
                 }
             }
             return uri.lastPathSegment ?: "document"
@@ -213,7 +212,7 @@ class SafDurabilityBridge(
             val pointer = SafStagingStore.readPendingPointer(context)
             if (pointer != null) {
                 val op = pointer.optString("operationId")
-                Log.i(SafStagingStore.TAG, "PENDING_POINTER operationId=$op")
+                EvLog.i(SafStagingStore.TAG, "PENDING_POINTER operationId=$op")
                 return pointer
             }
             val prefs = context.getSharedPreferences("FlutterSharedPreferences", Context.MODE_PRIVATE)
@@ -230,11 +229,11 @@ class SafDurabilityBridge(
                         newest = parsed
                     }
                 } catch (error: Exception) {
-                    Log.w(SafStagingStore.TAG, "PREFS_INTENT_PARSE_FAILED key=$key", error)
+                    EvLog.w(SafStagingStore.TAG, "PREFS_INTENT_PARSE_FAILED key=$key", error)
                 }
             }
             if (newest != null) {
-                Log.i(
+                EvLog.i(
                     SafStagingStore.TAG,
                     "PENDING_PREFS operationId=${newest.optString("operationId")}",
                 )

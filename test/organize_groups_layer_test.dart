@@ -3,6 +3,7 @@ import 'package:evidence_vault/domain/incident/current_incident.dart';
 import 'package:evidence_vault/domain/incident/incident_status.dart';
 import 'package:evidence_vault/models/journey_stage.dart';
 import 'package:evidence_vault/models/verification_factory.dart';
+import 'package:evidence_vault/models/workspace_capture_mode.dart';
 import 'package:evidence_vault/models/workspace_evidence_item.dart';
 import 'package:evidence_vault/theme/organize_visuals.dart';
 import 'package:evidence_vault/widgets/common/modern_art_material.dart';
@@ -61,6 +62,8 @@ Future<void> _pumpOrganize(
   required CurrentIncident incident,
   List<String> orderedCapturedEvidenceIds = const [],
   VoidCallback? onCreateGroup,
+  ValueChanged<WorkspaceEvidenceItem>? onEvidenceSelected,
+  ValueChanged<WorkspaceCaptureMode>? onAddOrganizeContext,
 }) async {
   addTearDown(() => tester.binding.setSurfaceSize(null));
   await tester.binding.setSurfaceSize(const Size(390, 844));
@@ -70,9 +73,9 @@ Future<void> _pumpOrganize(
         body: OrganizeWorkspaceView(
           incident: incident,
           orderedCapturedEvidenceIds: orderedCapturedEvidenceIds,
-          onEvidenceSelected: (_) {},
+          onEvidenceSelected: onEvidenceSelected ?? (_) {},
           onCreateGroup: onCreateGroup,
-          onAddOrganizeContext: (_) {},
+          onAddOrganizeContext: onAddOrganizeContext ?? (_) {},
         ),
       ),
     ),
@@ -214,6 +217,142 @@ void main() {
       expect(rect.bottom, lessThanOrEqualTo(toolbar.top + 0.5));
       expect(rect.bottom, lessThanOrEqualTo(card.bottom + 0.5));
     }
+  });
+
+  testWidgets('tapping Groups again slides the card back to peek', (
+    tester,
+  ) async {
+    await _pumpOrganize(
+      tester,
+      incident: _incident(evidence: moments(2)),
+      orderedCapturedEvidenceIds: const ['m0', 'm1'],
+    );
+
+    await tester.tap(find.byKey(OrganizeWorkspaceView.groupsPeekActionKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)).height,
+      closeTo(OrganizeWorkspaceView.groupsExpandedExtent, 1),
+    );
+
+    await tester.tap(find.byKey(OrganizeWorkspaceView.groupsPeekActionKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)).height,
+      closeTo(OrganizeWorkspaceView.groupsPeekExtent, 1),
+    );
+    expect(find.text('Person / Participant'), findsNothing);
+  });
+
+  testWidgets('tapping the Organize workspace collapses an open Groups card', (
+    tester,
+  ) async {
+    await _pumpOrganize(
+      tester,
+      incident: _incident(evidence: moments(2)),
+      orderedCapturedEvidenceIds: const ['m0', 'm1'],
+    );
+
+    await tester.tap(find.byKey(OrganizeWorkspaceView.groupsPeekActionKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)).height,
+      closeTo(OrganizeWorkspaceView.groupsExpandedExtent, 1),
+    );
+
+    final workspace = tester.getRect(
+      find.byKey(OrganizeWorkspaceView.workspaceDismissKey),
+    );
+    await tester.tapAt(Offset(workspace.left + 16, workspace.top + 8));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)).height,
+      closeTo(OrganizeWorkspaceView.groupsPeekExtent, 1),
+    );
+    expect(find.text('Person / Participant'), findsNothing);
+  });
+
+  testWidgets('workspace tap does nothing while Groups is collapsed', (
+    tester,
+  ) async {
+    await _pumpOrganize(
+      tester,
+      incident: _incident(evidence: moments(2)),
+      orderedCapturedEvidenceIds: const ['m0', 'm1'],
+    );
+
+    final before = tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey));
+    final workspace = tester.getRect(
+      find.byKey(OrganizeWorkspaceView.workspaceDismissKey),
+    );
+    await tester.tapAt(Offset(workspace.left + 16, workspace.top + 8));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)),
+      before,
+    );
+    expect(find.text('Person / Participant'), findsNothing);
+  });
+
+  testWidgets('open Groups still lets Voice fire and Groups stay tappable', (
+    tester,
+  ) async {
+    final selected = <WorkspaceCaptureMode>[];
+    await _pumpOrganize(
+      tester,
+      incident: _incident(evidence: moments(2)),
+      orderedCapturedEvidenceIds: const ['m0', 'm1'],
+      onAddOrganizeContext: selected.add,
+    );
+
+    await tester.tap(find.byKey(OrganizeWorkspaceView.groupsPeekActionKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+
+    await tester.tap(find.text('Voice'));
+    await tester.pump();
+    expect(selected, [WorkspaceCaptureMode.voice]);
+
+    await tester.tap(find.byKey(OrganizeWorkspaceView.groupsPeekActionKey));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 320));
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)).height,
+      closeTo(OrganizeWorkspaceView.groupsPeekExtent, 1),
+    );
+  });
+
+  testWidgets('rapid Groups and workspace taps settle at peek', (tester) async {
+    await _pumpOrganize(
+      tester,
+      incident: _incident(evidence: moments(2)),
+      orderedCapturedEvidenceIds: const ['m0', 'm1'],
+    );
+
+    final peek = find.byKey(OrganizeWorkspaceView.groupsPeekActionKey);
+    final workspace = tester.getRect(
+      find.byKey(OrganizeWorkspaceView.workspaceDismissKey),
+    );
+    await tester.tap(peek);
+    await tester.pumpAndSettle();
+    await tester.tapAt(Offset(workspace.left + 16, workspace.top + 8));
+    await tester.pumpAndSettle();
+    await tester.tap(peek);
+    await tester.pumpAndSettle();
+    await tester.tap(peek);
+    await tester.pumpAndSettle();
+
+    expect(
+      tester.getRect(find.byKey(OrganizeWorkspaceView.groupsKey)).height,
+      closeTo(OrganizeWorkspaceView.groupsPeekExtent, 1),
+    );
   });
 
   testWidgets('Groups card shows soft atmosphere artwork behind matrix', (

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:evidence_vault/controllers/workspace_session.dart';
@@ -97,6 +98,56 @@ void main() {
   tearDown(() async {
     await cleanupEnv();
   });
+
+  testWidgets(
+    'open presents Cockpit on the bound incident without awaiting session I/O',
+    (tester) async {
+      final incidentId =
+          WorkspaceSession.instance.controller.currentIncident.id;
+      expect(incidentId, isNotEmpty);
+      expect(manager.getActiveSession(incidentId), isNull);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Builder(
+            builder: (context) {
+              return Scaffold(
+                body: TextButton(
+                  onPressed: () {
+                    unawaited(
+                      CaptureCockpitScreen.open(
+                        context,
+                        initialMode: WorkspaceCaptureMode.photo,
+                        boundIncidentId: incidentId,
+                      ),
+                    );
+                  },
+                  child: const Text('open-cockpit'),
+                ),
+              );
+            },
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.tap(find.text('open-cockpit'));
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byKey(const Key('capture_cockpit_screen')), findsOneWidget);
+      expect(
+        WorkspaceSession.instance.controller.currentIncident.id,
+        incidentId,
+      );
+      expect(find.text('Preparing capture…'), findsOneWidget);
+
+      Navigator.of(
+        tester.element(find.byKey(const Key('capture_cockpit_screen'))),
+      ).pop();
+      await tester.pump();
+      await tester.pump();
+    },
+  );
 
   testWidgets('1. Capture Cockpit renders straight live surface + modality bar',
       (tester) async {

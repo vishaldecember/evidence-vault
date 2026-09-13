@@ -268,7 +268,7 @@ void main() {
       },
     );
 
-    testWidgets('advanced record from inspector switches to Evidence stage', (
+    testWidgets('advanced record from inspector returns to originating Capture', (
       tester,
     ) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -292,10 +292,6 @@ void main() {
       await tester.tap(find.text('View complete record →'));
       await tester.pumpAndSettle();
 
-      expect(
-        WorkspaceSession.instance.activeMethodologyStage,
-        InvestigationMethodologyStage.evidence,
-      );
       expect(find.text('Evidence Record'), findsOneWidget);
 
       await tester.tap(find.byTooltip('Back'));
@@ -303,11 +299,10 @@ void main() {
 
       expect(
         WorkspaceSession.instance.activeMethodologyStage,
-        InvestigationMethodologyStage.evidence,
+        InvestigationMethodologyStage.capture,
       );
-      expect(find.text('Organize and enrich your records'), findsOneWidget);
-      expect(find.text('Capture what happened clearly'), findsNothing);
-      expect(find.byType(InvestigationWorkspaceTabBar), findsNothing);
+      expect(find.text('Capture what happened clearly'), findsOneWidget);
+      expect(find.text('Organize and enrich your records'), findsNothing);
     });
 
     testWidgets('quick capture resets workspace to Capture stage', (
@@ -330,6 +325,71 @@ void main() {
         InvestigationMethodologyStage.capture,
       );
       expect(find.text('Capture what happened clearly'), findsOneWidget);
+    });
+
+    testWidgets('quick capture Video resets leftover Evidence stage', (
+      tester,
+    ) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(412, 915));
+
+      WorkspaceSession.instance.enterEvidenceEditing();
+
+      await tester.pumpWidget(const MaterialApp(home: MainShellScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Video').first);
+      await tester.pump();
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+      expect(
+        WorkspaceSession.instance.activeMethodologyStage,
+        InvestigationMethodologyStage.capture,
+      );
+      expect(find.text('Capture what happened clearly'), findsOneWidget);
+    });
+
+    testWidgets('quick capture Voice resets leftover Evidence stage', (
+      tester,
+    ) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(412, 915));
+
+      WorkspaceSession.instance.enterEvidenceEditing();
+
+      await tester.pumpWidget(const MaterialApp(home: MainShellScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Voice').first);
+      await tester.pump();
+      await tester.pumpAndSettle(const Duration(milliseconds: 100));
+
+      expect(
+        WorkspaceSession.instance.activeMethodologyStage,
+        InvestigationMethodologyStage.capture,
+      );
+      expect(find.text('Capture what happened clearly'), findsOneWidget);
+    });
+
+    testWidgets('quick capture Note resets leftover Evidence stage', (
+      tester,
+    ) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(412, 915));
+
+      WorkspaceSession.instance.enterEvidenceEditing();
+
+      await tester.pumpWidget(const MaterialApp(home: MainShellScreen()));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('Note').first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 100));
+
+      expect(
+        WorkspaceSession.instance.activeMethodologyStage,
+        InvestigationMethodologyStage.capture,
+      );
     });
 
     testWidgets(

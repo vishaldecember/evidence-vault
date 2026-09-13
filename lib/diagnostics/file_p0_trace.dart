@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/workspace_session.dart';
@@ -96,15 +97,17 @@ abstract final class FileP0Trace {
       lastPath = path;
     }
     final resultPart = result == null ? '' : ' result=$result';
-    debugPrint(
-      '[FILEP0] STEP=$step$resultPart ${_common(
-        incidentId: incidentId,
-        mounted: mounted,
-        fileName: fileName,
-        fileSize: fileSize,
-        extra: extra,
-      )}',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[FILEP0] STEP=$step$resultPart ${_common(
+          incidentId: incidentId,
+          mounted: mounted,
+          fileName: fileName,
+          fileSize: fileSize,
+          extra: extra,
+        )}',
+      );
+    }
   }
 
   static void failure(
@@ -118,6 +121,9 @@ abstract final class FileP0Trace {
     String? path,
     String? extra,
   }) {
+    if (!kDebugMode) {
+      return;
+    }
     debugPrint(
       '[FILEP0] FAILURE=$where exception=$error ${_common(
         incidentId: incidentId,
@@ -138,7 +144,9 @@ abstract final class FileP0Trace {
   }
 
   static void note(String message, {String? extra}) {
-    debugPrint('[FILEP0] NOTE=$message ${_common(extra: extra)}');
+    if (kDebugMode) {
+      debugPrint('[FILEP0] NOTE=$message ${_common(extra: extra)}');
+    }
   }
 
   static void rememberMedia({

@@ -346,6 +346,7 @@ class SpatialGraphLayout {
           kind: SpatialGraphNodeKind.location,
           label: loc.label,
           position: Offset(axisX - locationInset, pinY),
+          evidenceId: moment.id,
           locationKey: loc.key,
           locationUncertain: loc.uncertain,
         ),

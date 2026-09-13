@@ -9,15 +9,19 @@ import 'evidence_upload_queue.dart';
 
 /// Disk-backed store for [QueuedEvidenceUpload] entries (Sprint 4D).
 ///
-/// Persists the retry queue to [SharedPreferences] as JSON so uploads that
-/// failed while offline survive an app restart. [EvidenceUploadQueue] is the
-/// in-memory, listenable façade over this store — screens should keep
-/// depending on [EvidenceUploadQueue], not this class directly.
+/// **Phase 2(B)-1 — quarantined.** Production upload retry ownership moved to
+/// [EvidenceSyncQueue] / [EvidenceSyncManager]. This class is retained so
+/// leftover `durable_upload_queue_v1` rows can be wiped on Clear Vault /
+/// account deletion. Do not enqueue live retries here. File deletion is a
+/// later cleanup phase.
+///
+/// [EvidenceUploadQueue] is the in-memory façade over this store.
 class DurableUploadQueue {
   DurableUploadQueue({SharedPreferences? preferences})
       : _preferencesOverride = preferences;
 
-  static const String _storageKey = 'durable_upload_queue_v1';
+  static const String storageKey = 'durable_upload_queue_v1';
+  static const String _storageKey = storageKey;
 
   SharedPreferences? _preferencesOverride;
   final List<QueuedEvidenceUpload> _items = [];
@@ -76,6 +80,20 @@ class DurableUploadQueue {
     _items.removeWhere((entry) => entry.evidenceId == evidenceId);
     if (_items.length != before) {
       await save();
+    }
+  }
+
+  /// Drops in-memory and persisted leftover retry rows (Clear Vault).
+  Future<void> clear() async {
+    _items.clear();
+    try {
+      final prefs = await _preferences;
+      await prefs.remove(_storageKey);
+    } catch (error) {
+      if (kDebugMode &&
+          !error.toString().contains('Binding has not yet been initialized')) {
+        debugPrint('[DurableUploadQueue] clear failed: $error');
+      }
     }
   }
 

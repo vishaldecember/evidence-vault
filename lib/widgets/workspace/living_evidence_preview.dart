@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/workspace_evidence_item.dart';
 import '../../presentation/evidence_presentation_resolver.dart';
+import '../../security/https_preview_url.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
 import '../../utils/workspace_evidence_formatters.dart';
@@ -199,10 +200,7 @@ class _MediaImagePreview extends StatelessWidget {
 
   final String imagePath;
 
-  static bool _isNetworkUrl(String path) {
-    final lower = path.toLowerCase();
-    return lower.startsWith('http://') || lower.startsWith('https://');
-  }
+  static bool _isNetworkUrl(String path) => isHttpsPreviewUrl(path);
 
   @override
   Widget build(BuildContext context) {

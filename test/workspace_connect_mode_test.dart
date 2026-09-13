@@ -7,7 +7,7 @@ import 'package:evidence_vault/models/investigation_methodology_stage.dart';
 import 'package:evidence_vault/screens/incident_workspace_shell.dart';
 import 'package:evidence_vault/widgets/workspace/continue_capturing_section.dart';
 import 'package:evidence_vault/widgets/workspace/connect_evidence_action.dart';
-import 'package:evidence_vault/widgets/workspace/journey_evidence_thumbnail.dart';
+import 'package:evidence_vault/widgets/workspace/organize_workspace_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -57,6 +57,7 @@ void main() {
       await _pumpEvidenceStage(tester, controller);
 
       expect(find.byType(ConnectEvidencesPill), findsNothing);
+      expect(find.text('Connect'), findsNothing);
     });
 
     testWidgets('visible when at least two journey evidence items', (tester) async {
@@ -68,8 +69,10 @@ void main() {
 
       await _pumpEvidenceStage(tester, controller);
 
-      expect(find.byType(ConnectEvidencesPill), findsOneWidget);
-      expect(find.text('Connect'), findsOneWidget);
+      // Organize uses Groups+, not the leftover Connect pill.
+      expect(find.byType(ConnectEvidencesPill), findsNothing);
+      expect(find.text('Connect'), findsNothing);
+      expect(find.byKey(OrganizeWorkspaceView.groupsPlusKey), findsOneWidget);
     });
   });
 
@@ -82,11 +85,10 @@ void main() {
       );
 
       await _pumpEvidenceStage(tester, controller);
-      await tester.tap(find.byType(ConnectEvidencesPill));
-      await tester.pumpAndSettle();
 
-      expect(find.text('Done'), findsOneWidget);
-      expect(find.text('Cancel'), findsOneWidget);
+      expect(find.byType(ConnectEvidencesPill), findsNothing);
+      expect(find.text('Done'), findsNothing);
+      expect(find.byKey(OrganizeWorkspaceView.groupsPlusKey), findsOneWidget);
     });
 
     testWidgets('selects multiple evidence before commit', (tester) async {
@@ -101,26 +103,9 @@ void main() {
       );
 
       await _pumpEvidenceStage(tester, controller);
-      await tester.tap(find.byType(ConnectEvidencesPill));
-      await tester.pumpAndSettle();
 
-      final thumbnails = find.byType(JourneyEvidenceThumbnail);
-      await tester.ensureVisible(thumbnails.at(0));
-      await tester.tap(thumbnails.at(0));
-      await tester.pump();
-      await tester.ensureVisible(thumbnails.at(1));
-      await tester.tap(thumbnails.at(1));
-      await tester.pumpAndSettle();
-
+      expect(find.byType(ConnectEvidencesPill), findsNothing);
       expect(controller.state.relationshipGroups, isEmpty);
-      expect(
-        tester.widget<JourneyEvidenceThumbnail>(thumbnails.at(0)).isSelected,
-        isTrue,
-      );
-      expect(
-        tester.widget<JourneyEvidenceThumbnail>(thumbnails.at(1)).isSelected,
-        isTrue,
-      );
     });
 
     testWidgets('Done commits one relationship group', (tester) async {
@@ -131,21 +116,13 @@ void main() {
       );
 
       await _pumpEvidenceStage(tester, controller);
-      await tester.tap(find.byType(ConnectEvidencesPill));
-      await tester.pumpAndSettle();
+      expect(find.byType(ConnectEvidencesPill), findsNothing);
 
-      final thumbnails = find.byType(JourneyEvidenceThumbnail);
-      await tester.tap(thumbnails.at(0));
-      await tester.pump();
-      await tester.tap(thumbnails.at(1));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Done'));
-      await tester.pumpAndSettle();
-
+      final group = controller.commitRelationshipGroup(
+        evidenceIds: ['photo', 'video'],
+      );
+      expect(group, isNotNull);
       expect(controller.state.relationshipGroups, hasLength(1));
-      expect(find.text('Connect'), findsOneWidget);
-      expect(find.text('Relationship Groups'), findsOneWidget);
     });
 
     testWidgets('Cancel exits Connect Mode without commit', (tester) async {
@@ -156,21 +133,10 @@ void main() {
       );
 
       await _pumpEvidenceStage(tester, controller);
-      await tester.tap(find.byType(ConnectEvidencesPill));
-      await tester.pumpAndSettle();
 
-      final thumbnails = find.byType(JourneyEvidenceThumbnail);
-      await tester.tap(thumbnails.at(0));
-      await tester.pump();
-      await tester.tap(thumbnails.at(1));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.text('Cancel'));
-      await tester.pumpAndSettle();
-
+      expect(find.byType(ConnectEvidencesPill), findsNothing);
+      expect(find.text('Cancel'), findsNothing);
       expect(controller.state.relationshipGroups, isEmpty);
-      expect(find.text('Connect'), findsOneWidget);
-      expect(find.text('Done'), findsNothing);
     });
 
     testWidgets('capture stage does not expose Connect action', (tester) async {
@@ -214,40 +180,18 @@ void main() {
       );
 
       await _pumpEvidenceStage(tester, controller);
+      expect(find.byType(ConnectEvidencesPill), findsNothing);
 
-      await tester.tap(find.byType(ConnectEvidencesPill));
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<ConnectEvidencesPill>(find.byType(ConnectEvidencesPill))
-            .accentColorIndex,
-        0,
+      final first = controller.commitRelationshipGroup(
+        evidenceIds: ['photo', 'video'],
       );
-
-      var thumbnails = find.byType(JourneyEvidenceThumbnail);
-      await tester.tap(thumbnails.at(0));
-      await tester.pump();
-      await tester.tap(thumbnails.at(1));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Done'));
-      await tester.pumpAndSettle();
-
-      await tester.tap(find.byType(ConnectEvidencesPill));
-      await tester.pumpAndSettle();
-      expect(
-        tester.widget<ConnectEvidencesPill>(find.byType(ConnectEvidencesPill))
-            .accentColorIndex,
-        1,
+      final second = controller.commitRelationshipGroup(
+        evidenceIds: ['photo', 'note'],
       );
-
-      thumbnails = find.byType(JourneyEvidenceThumbnail);
-      await tester.tap(thumbnails.at(0));
-      await tester.pump();
-      await tester.tap(thumbnails.at(2));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Done'));
-      await tester.pumpAndSettle();
 
       expect(controller.state.relationshipGroups, hasLength(2));
+      expect(first?.colorIndex, 0);
+      expect(second?.colorIndex, 1);
       expect(controller.state.relationshipGroups.first.colorIndex, 0);
       expect(controller.state.relationshipGroups.last.colorIndex, 1);
     });

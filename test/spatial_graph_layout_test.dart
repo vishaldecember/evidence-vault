@@ -8,6 +8,7 @@ import 'package:evidence_vault/models/workspace_evidence_item.dart';
 import 'package:evidence_vault/services/investigation/spatial_graph_layout.dart';
 import 'package:evidence_vault/services/relationship/relationship_engine.dart';
 import 'package:evidence_vault/theme/app_colors.dart';
+import 'package:evidence_vault/utils/evidence_formatters.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_graph_workspace.dart';
 import 'package:evidence_vault/widgets/workspace/organize_context_anchor_arrow.dart';
 import 'package:flutter/material.dart';
@@ -1323,6 +1324,130 @@ void main() {
     await tester.tap(find.byKey(InvestigationGraphWorkspace.nodeKey('photo')));
     await tester.pumpAndSettle();
     expect(tapped?.id, 'photo');
+  });
+
+  testWidgets('tapping GPS reveals the full stored coordinate pair', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(360, 800));
+
+    const latitude = 30.086731;
+    const longitude = 78.267608;
+    final pair = EvidenceFormatters.coordinates(latitude, longitude);
+    WorkspaceEvidenceItem? tapped;
+    final photo = _item(
+      id: 'photo',
+      latitude: latitude,
+      longitude: longitude,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: InvestigationGraphWorkspace(
+            graph: _graph(items: [photo]),
+            onEvidenceTap: (item) => tapped = item,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final locationKey = InvestigationGraphWorkspace.nodeKey(
+      SpatialGraphLayout.locationNodeId('photo'),
+    );
+    expect(find.byKey(locationKey), findsOneWidget);
+    expect(
+      find.byKey(InvestigationGraphWorkspace.gpsCoordinateTitleKey),
+      findsNothing,
+    );
+    expect(find.text(pair), findsNothing);
+    expect(find.textContaining('30.086'), findsNothing);
+
+    await tester.tap(find.byKey(locationKey));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(InvestigationGraphWorkspace.gpsCoordinateTitleKey),
+      findsOneWidget,
+    );
+    expect(find.text(pair), findsOneWidget);
+    expect(pair, '30.08673, 78.26761');
+    expect(tapped, isNull);
+    expect(tester.takeException(), isNull);
+
+    await tester.tap(find.byKey(locationKey));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(InvestigationGraphWorkspace.gpsCoordinateTitleKey),
+      findsNothing,
+    );
+
+    await tester.tap(find.byKey(locationKey));
+    await tester.pumpAndSettle();
+    expect(find.text(pair), findsOneWidget);
+
+    await tester.tap(find.byKey(InvestigationGraphWorkspace.nodeKey('photo')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(InvestigationGraphWorkspace.gpsCoordinateTitleKey),
+      findsNothing,
+    );
+    expect(tapped?.id, 'photo');
+  });
+
+  testWidgets('named location tap still shows the GPS coordinate pair', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+
+    const latitude = 27.7172;
+    const longitude = 85.3240;
+    final pair = EvidenceFormatters.coordinates(latitude, longitude);
+    final photo = _item(
+      id: 'photo',
+      latitude: latitude,
+      longitude: longitude,
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: InvestigationGraphWorkspace(
+            graph: _graph(
+              items: [photo],
+              collections: [
+                EvidenceCollection(
+                  id: 'loc-1',
+                  incidentId: 'inc-graph',
+                  name: 'Cafe',
+                  category: 'location',
+                  systemGenerated: true,
+                  displayOrder: 0,
+                  createdAt: DateTime(2026, 8, 14),
+                  updatedAt: DateTime(2026, 8, 14),
+                  memberEvidenceIds: const ['photo'],
+                ),
+              ],
+            ),
+            onEvidenceTap: (_) {},
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cafe'), findsOneWidget);
+    await tester.tap(
+      find.byKey(
+        InvestigationGraphWorkspace.nodeKey(
+          SpatialGraphLayout.locationNodeId('photo'),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Cafe'), findsOneWidget);
+    expect(find.text(pair), findsOneWidget);
   });
 
   test('a person appearing once stays a single horizontal to one node', () {

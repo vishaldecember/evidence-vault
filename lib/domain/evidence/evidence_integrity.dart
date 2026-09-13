@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -22,9 +23,27 @@ abstract final class EvidenceIntegrity {
   }
 
   /// Hex SHA-256 of the file at [path] as stored. Never a thumbnail.
+  ///
+  /// File read + digest run off the UI isolate. Does not change the
+  /// fingerprint algorithm or which bytes are hashed.
+  @visibleForTesting
+  static Future<String> Function(String path)? debugSha256OfFile;
+
   static Future<String> sha256OfFile(String path) async {
-    final bytes = await File(path).readAsBytes();
-    return sha256OfBytes(bytes);
+    final override = debugSha256OfFile;
+    if (override != null) {
+      return override(path);
+    }
+    if (kIsWeb) {
+      final bytes = await File(path).readAsBytes();
+      return sha256OfBytes(bytes);
+    }
+    return Isolate.run(() => _sha256OfFileSync(path));
+  }
+
+  static String _sha256OfFileSync(String path) {
+    final bytes = File(path).readAsBytesSync();
+    return sha256.convert(bytes).toString();
   }
 
   static EvidenceIntegrityCheck compare({

@@ -121,7 +121,7 @@ class _WelcomeNameScreenState extends State<WelcomeNameScreen> {
                                     : AppSpacing.huge,
                               ),
                               Text(
-                                'Welcome to Evidence Vault',
+                                'Welcome to My Truth',
                                 textAlign: TextAlign.center,
                                 style: AppTextStyles.pageTitle.copyWith(
                                   fontSize: 26,

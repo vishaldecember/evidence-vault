@@ -61,6 +61,7 @@ import '../services/storage/evidence_upload_coordinator.dart';
 import '../services/storage/evidence_upload_models.dart';
 import '../services/storage/local_evidence_cache.dart';
 import '../services/storage/storage_upload_result.dart';
+import '../services/sync/evidence_sync_manager.dart';
 import '../services/persistence/incident_cloud_sync_service.dart';
 import '../services/persistence/incident_library_service.dart';
 import '../services/persistence/local_incident_pointer.dart';
@@ -776,21 +777,10 @@ class WorkspaceEvidenceController extends ChangeNotifier
     String evidenceId, {
     EvidenceUploadCoordinator? uploadCoordinator,
   }) async {
-    final coordinator = uploadCoordinator ?? EvidenceUploadCoordinator.instance;
-    final result = await coordinator.retry(evidenceId);
-    if (result == null) {
-      failCaptureUpload(evidenceId);
-      return null;
-    }
-    completeCaptureUpload(
-      evidenceId: evidenceId,
-      storagePath: result.storagePath,
-      downloadUrl: result.downloadUrl,
-      mimeType: result.contentType,
-      fileSizeBytes: result.fileSize,
-      thumbnailUrl: result.thumbnailUrl,
-    );
-    return result;
+    // Retry ownership is EvidenceSyncManager / EvidenceSyncQueue.
+    // Coordinator remains the progress + Storage worker, not a second queue.
+    await EvidenceSyncManager.instance.retry(evidenceId);
+    return null;
   }
 
   EvidenceUploadProgress? uploadProgressFor(String evidenceId) =>

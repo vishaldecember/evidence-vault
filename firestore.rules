@@ -83,6 +83,9 @@ service cloud.firestore {
         match /reconstructionNotes/{docId} {
           allow read, create, update, delete: if isOwner(userId);
         }
+        match /participants/{docId} {
+          allow read, create, update, delete: if isOwner(userId);
+        }
       }
     }
   }

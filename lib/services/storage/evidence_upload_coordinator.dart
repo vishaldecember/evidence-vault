@@ -1,6 +1,3 @@
-import 'dart:async';
-
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 
 import '../../models/workspace_capture_mode.dart';
@@ -12,67 +9,37 @@ import 'evidence_upload_models.dart';
 import 'evidence_upload_queue.dart';
 import 'storage_upload_result.dart';
 
-/// Orchestrates Firebase Storage uploads + local retry queue.
+/// Orchestrates Firebase Storage uploads and publishes progress.
 ///
 /// Progress is exposed without blocking capture. Goes through [StorageRepository]
 /// so UI never touches the Storage SDK. Reads the active user from
 /// [UserSessionService] — controllers/services avoid depending on
 /// [AuthService] directly.
 ///
-/// Loads the durable retry queue on first use and watches connectivity
-/// (Sprint 4D) so queued uploads retry automatically once back online.
+/// **Phase 2(B)-1:** retry ownership is [EvidenceSyncManager] /
+/// [EvidenceSyncQueue]. This coordinator must not persist a second durable
+/// retry queue or independently retry uploads on connectivity.
 /// Failure UI is optional via [EvidenceUploadFeedback]; percent snackbars
 /// are intentionally not used (Sprint 4F — quiet sync).
 class EvidenceUploadCoordinator extends ChangeNotifier {
   EvidenceUploadCoordinator({
     StorageRepository? storage,
     EvidenceUploadQueue? queue,
-    Connectivity? connectivity,
   })  : _storage = storage ?? FirebaseStorageRepository(),
-        _queue = queue ?? EvidenceUploadQueue(),
-        _connectivity = connectivity ?? Connectivity() {
+        _queue = queue ?? EvidenceUploadQueue() {
     _queueReady = _queue.restore();
-    _listenForConnectivity();
   }
 
   static final EvidenceUploadCoordinator instance = EvidenceUploadCoordinator();
 
   final StorageRepository _storage;
   final EvidenceUploadQueue _queue;
-  final Connectivity _connectivity;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
   Future<void>? _queueReady;
 
   final Map<String, EvidenceUploadProgress> _progress = {};
 
-  /// Resolves once the durable retry queue has been loaded from disk.
+  /// Resolves once leftover durable rows (if any) have been loaded from disk.
   Future<void> get queueReady => _queueReady ??= _queue.restore();
-
-  void _listenForConnectivity() {
-    try {
-      _connectivitySubscription = _connectivity.onConnectivityChanged.listen(
-        (results) {
-          final isOnline = results.any(
-            (result) => result != ConnectivityResult.none,
-          );
-          if (isOnline && _queue.hasPending) {
-            unawaited(retryAll());
-          }
-        },
-        onError: (Object error, StackTrace stackTrace) {
-          debugPrint('[Storage] connectivity stream error: $error');
-        },
-      );
-    } catch (error) {
-      debugPrint('[Storage] connectivity listener unavailable: $error');
-    }
-  }
-
-  @override
-  void dispose() {
-    unawaited(_connectivitySubscription?.cancel());
-    super.dispose();
-  }
 
   EvidenceUploadQueue get queue => _queue;
 
@@ -137,22 +104,8 @@ class EvidenceUploadCoordinator extends ChangeNotifier {
           errorMessage: 'Sign in required to upload evidence.',
         ),
       );
-      _enqueueFailure(
-        evidenceId: evidenceId,
-        incidentId: incidentId,
-        localFilePath: localFilePath,
-        mode: mode,
-        deviceModel: deviceModel,
-        latitude: latitude,
-        longitude: longitude,
-        captureTime: captureTime,
-      );
       return null;
     }
-
-    final folder = _folderFor(mode);
-    final intendedPath =
-        'users/$userId/incidents/$incidentId/$folder/$evidenceId';
 
     _setProgress(
       evidenceId,
@@ -276,47 +229,25 @@ class EvidenceUploadCoordinator extends ChangeNotifier {
           errorMessage: 'Upload failed.',
         ),
       );
-      _enqueueFailure(
-        evidenceId: evidenceId,
-        incidentId: incidentId,
-        localFilePath: localFilePath,
-        mode: mode,
-        deviceModel: deviceModel,
-        latitude: latitude,
-        longitude: longitude,
-        captureTime: captureTime,
-        intendedPath: intendedPath,
-      );
       return null;
     }
   }
 
+  /// Manual retry is owned by [EvidenceSyncManager.retry].
+  /// Leftover durable rows are not independently retried from this coordinator.
   Future<StorageUploadResult?> retry(String evidenceId) async {
-    final queued = _queue.byEvidenceId(evidenceId);
-    if (queued == null) {
-      return null;
-    }
-    final currentUserId = activeUserId ?? '';
-    if (!queued.isOwnedBy(currentUserId)) {
-      return null;
-    }
-    return uploadCapturedMedia(
-      evidenceId: queued.evidenceId,
-      incidentId: queued.incidentId,
-      localFilePath: queued.localFilePath,
-      mode: queued.mode,
-      ownerUserId: queued.userId,
-      deviceModel: queued.deviceModel,
-      latitude: queued.latitude,
-      longitude: queued.longitude,
-      captureTime: queued.captureTime,
-    );
+    return null;
   }
 
-  Future<void> retryAll() async {
-    final ids = _queue.items.map((item) => item.evidenceId).toList();
-    for (final id in ids) {
-      await retry(id);
+  /// No-op: connectivity-driven retry is owned by [EvidenceSyncManager].
+  Future<void> retryAll() async {}
+
+  /// Wipes leftover independent retry rows (Clear Vault / account deletion).
+  Future<void> clearIndependentRetryState() async {
+    await _queue.clear();
+    if (_progress.isNotEmpty) {
+      _progress.clear();
+      notifyListeners();
     }
   }
 
@@ -334,46 +265,6 @@ class EvidenceUploadCoordinator extends ChangeNotifier {
       return (deviceModel: null, latitude: null, longitude: null);
     }
   }
-
-  void _enqueueFailure({
-    required String evidenceId,
-    required String incidentId,
-    required String localFilePath,
-    required WorkspaceCaptureMode mode,
-    String? deviceModel,
-    double? latitude,
-    double? longitude,
-    DateTime? captureTime,
-    String? intendedPath,
-  }) {
-    final userId = activeUserId ?? '';
-    final folder = _folderFor(mode);
-    _queue.enqueue(
-      buildQueuedEvidenceUpload(
-        evidenceId: evidenceId,
-        incidentId: incidentId,
-        userId: userId,
-        localFilePath: localFilePath,
-        mode: mode,
-        intendedStoragePath: intendedPath ??
-            (userId.isEmpty
-                ? 'unattributed/incidents/$incidentId/$folder/$evidenceId'
-                : 'users/$userId/incidents/$incidentId/$folder/$evidenceId'),
-        deviceModel: deviceModel,
-        latitude: latitude,
-        longitude: longitude,
-        captureTime: captureTime,
-      ),
-    );
-  }
-
-  static String _folderFor(WorkspaceCaptureMode mode) => switch (mode) {
-        WorkspaceCaptureMode.photo => 'photos',
-        WorkspaceCaptureMode.video => 'videos',
-        WorkspaceCaptureMode.voice => 'voice',
-        WorkspaceCaptureMode.file => 'attachments',
-        WorkspaceCaptureMode.note => 'attachments',
-      };
 
   void _setProgress(String evidenceId, EvidenceUploadProgress progress) {
     final existing = _progress[evidenceId];

@@ -27,6 +27,7 @@ import '../../theme/app_text_styles.dart';
 import '../../widgets/capture/capture_preview_overlay.dart';
 import '../../widgets/capture/cockpit_voice_visualizer.dart';
 import '../../widgets/capture/voice_preview_panel.dart';
+import '../../widgets/common/app_snackbar.dart';
 
 /// Instant Capture session — Capture → Confirm → Continue.
 ///
@@ -53,6 +54,27 @@ class ContinuousCaptureSession extends StatefulWidget {
   /// Test hook — DONE must not mint evidence when durability cannot be verified.
   @visibleForTesting
   static bool debugFailVoiceDurability = false;
+
+  /// Test hook — Accept/DONE treat local commit as a durability failure.
+  @visibleForTesting
+  static bool debugFailLocalCommit = false;
+
+  /// Test seam — delay / fail Stop-path video thumbnail without a camera.
+  @visibleForTesting
+  static Future<String?> Function(String videoPath)?
+      debugGenerateVideoThumbnail;
+
+  /// Last thumbnail path attached after Stop. Tests only.
+  @visibleForTesting
+  static String? debugLastAttachedVideoThumbnail;
+
+  /// Shown when local durability/cache commit fails. Preview stays.
+  static const localCommitFailureMessage =
+      'The capture was not preserved. Please try again.';
+
+  /// Shown when Accept would write to a different incident. Preview stays.
+  static const staleIncidentFailureMessage =
+      'This capture couldn’t be preserved because the incident changed. Try again.';
 
   /// Previous central voice control diameter (large [_RoundAction]).
   @visibleForTesting
@@ -95,8 +117,12 @@ class ContinuousCaptureSession extends StatefulWidget {
   /// Lets Capture Cockpit await pending preview commit before exit / modality switch.
   ///
   /// [finalizeActiveVoice] is true only for DONE — Close / modality switch
-  /// must not turn an in-progress recording into evidence.
-  final ValueChanged<Future<void> Function({bool finalizeActiveVoice})>?
+  /// must not turn an in-progress recording into evidence. DONE also
+  /// finalizes an in-progress video onto the existing Stop → Preview path.
+  ///
+  /// Returns `false` when a completed preview could not be preserved — the
+  /// preview must stay and the caller must not pop / switch modality.
+  final ValueChanged<Future<bool> Function({bool finalizeActiveVoice})>?
       onProvideCommitPending;
 
   static Future<int> open({
@@ -137,7 +163,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
   bool _busy = false;
 
   /// In-flight accept — DONE/exit must await this to avoid discard races / dupes.
-  Future<void>? _acceptInFlight;
+  Future<bool>? _acceptInFlight;
 
   CameraController? _camera;
   String? _cameraError;
@@ -157,6 +183,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
   _VideoPhase _videoPhase = _VideoPhase.ready;
   String? _videoPreviewPath;
   String? _videoThumbnailPath;
+  int _videoPreviewGeneration = 0;
   DateTime? _videoStartedAt;
   Duration _videoElapsed = Duration.zero;
   Timer? _videoTicker;
@@ -215,23 +242,24 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
         (widget.boundIncidentId ?? widget.controller.currentIncident.id).trim();
     widget.onProvideMediaRelease?.call(_releaseMediaResources);
     widget.onProvideCommitPending?.call(commitPendingCaptureIfNeeded);
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      if (_isFlutterTest) {
-        return;
-      }
+    if (!_isFlutterTest) {
       unawaited(_bootstrap());
-    });
+    }
   }
 
   /// Commits a completed Photo/Video/Voice preview if one exists.
   ///
-  /// Idempotent: awaits any in-flight accept first. Video/photo never
-  /// fabricate evidence from an active recording. Voice DONE
-  /// ([finalizeActiveVoice]) finalizes a valid in-progress recording first,
-  /// then preserves it — playback is not required. Close / modality switch
-  /// pass [finalizeActiveVoice] false so discard/cancel stays non-saving.
-  Future<void> commitPendingCaptureIfNeeded({
+  /// Idempotent: awaits any in-flight accept first. Photo never fabricates
+  /// evidence from a live shutter. Voice DONE ([finalizeActiveVoice])
+  /// finalizes a valid in-progress recording first, then preserves it —
+  /// playback is not required. Video DONE uses the same flag to run the
+  /// canonical [_finishVideo] path and stay on Preview (not auto-Accept).
+  /// Close / modality switch pass [finalizeActiveVoice] false so
+  /// discard/cancel stays non-saving.
+  ///
+  /// Returns `false` when the caller must stay — commit failed, or an
+  /// in-progress video was finalized into Preview.
+  Future<bool> commitPendingCaptureIfNeeded({
     bool finalizeActiveVoice = false,
   }) async {
     final inFlight = _acceptInFlight;
@@ -244,31 +272,55 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
             _voicePhase == _VoicePhase.paused)) {
       await _finishVoice();
     }
+    if (finalizeActiveVoice &&
+        widget.mode == WorkspaceCaptureMode.video &&
+        (_videoPhase == _VideoPhase.recording ||
+            _videoPhase == _VideoPhase.paused)) {
+      await _finishVideo();
+      // Same destination as Stop. Preview is not yet durable evidence.
+      return false;
+    }
     if (!_hasPendingCompletedCapture) {
-      return;
+      return true;
     }
     if (_photoPhase == _PhotoPhase.preview && _photoPreviewPath != null) {
-      await _acceptPhoto();
-      return;
+      return _acceptPhoto();
     }
     if (_videoPhase == _VideoPhase.preview && _videoPreviewPath != null) {
-      await _acceptVideo();
-      return;
+      return _acceptVideo();
     }
     if (_voicePhase == _VoicePhase.preview && _voicePreviewPath != null) {
-      await _acceptVoice();
+      return _acceptVoice();
     }
+    return true;
   }
 
-  Future<void> _trackAccept(Future<void> future) async {
+  Future<bool> _trackAccept(Future<bool> future) async {
     _acceptInFlight = future;
     try {
-      await future;
+      return await future;
     } finally {
       if (identical(_acceptInFlight, future)) {
         _acceptInFlight = null;
       }
     }
+  }
+
+  bool get _debugFailLocalCommit =>
+      ContinuousCaptureSession.debugFailLocalCommit ||
+      (ContinuousCaptureSession.debugFailVoiceDurability &&
+          widget.mode == WorkspaceCaptureMode.voice);
+
+  void _reportAcceptFailure({required bool staleIncident}) {
+    if (!mounted) {
+      return;
+    }
+    AppSnackBar.showError(
+      context,
+      staleIncident
+          ? ContinuousCaptureSession.staleIncidentFailureMessage
+          : ContinuousCaptureSession.localCommitFailureMessage,
+    );
   }
 
   Future<void> _bootstrap() async {
@@ -330,6 +382,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
 
   @override
   void dispose() {
+    _videoPreviewGeneration += 1;
     // Thorough release (stop streams/recording) — same path as Done exit.
     // Cannot await in dispose; Cockpit awaits via onProvideMediaRelease.
     unawaited(_releaseMediaResources());
@@ -372,7 +425,11 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
   Future<void> _done() async {
     // DONE must durably commit a completed preview before leaving.
     // Voice: finalize an in-progress recording first — playback is optional.
-    await commitPendingCaptureIfNeeded(finalizeActiveVoice: true);
+    final committed =
+        await commitPendingCaptureIfNeeded(finalizeActiveVoice: true);
+    if (!committed) {
+      return;
+    }
     if (!_isFlutterTest) {
       await _releaseMediaResources();
     } else {
@@ -388,25 +445,31 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     Navigator.of(context).pop(_capturedCount);
   }
 
-  Future<void> _acceptMedia({
+  /// Local commit barrier. Preview dismissal is the caller's job on `true`.
+  Future<bool> _acceptMedia({
     required WorkspaceCaptureMode mode,
     required String path,
     String? thumbnailPath,
   }) async {
-    if (_busy) return;
+    if (_busy) return false;
     final boundIncidentIdAtStart = _boundIncidentIdAtOpen;
     if (!_operationOwnsBound) {
-      return;
+      _reportAcceptFailure(staleIncident: true);
+      return false;
     }
     setState(() => _busy = true);
     try {
       final file = File(path);
-      if (!await file.exists()) return;
+      if (!await file.exists()) {
+        _reportAcceptFailure(staleIncident: false);
+        return false;
+      }
       if (!InvestigateIncidentScope.sessionMatchesBound(
         boundIncidentIdAtStart,
         widget.controller.currentIncident.id,
       )) {
-        return;
+        _reportAcceptFailure(staleIncident: true);
+        return false;
       }
       final coordinator = EvidenceUploadCoordinator.instance;
       late final String id;
@@ -423,16 +486,22 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
           uploadCoordinator: coordinator,
         );
       } on StaleCaptureIncidentException {
-        return;
+        _reportAcceptFailure(staleIncident: true);
+        return false;
       } on MediaDurabilityException {
-        return;
+        _reportAcceptFailure(staleIncident: false);
+        return false;
       }
-      if (!mounted ||
-          !InvestigateIncidentScope.sessionMatchesBound(
-            boundIncidentIdAtStart,
-            widget.controller.currentIncident.id,
-          )) {
-        return;
+      if (!mounted) {
+        return true;
+      }
+      if (!InvestigateIncidentScope.sessionMatchesBound(
+        boundIncidentIdAtStart,
+        widget.controller.currentIncident.id,
+      )) {
+        // Commit already succeeded for the original incident — do not attach
+        // elsewhere. Caller still dismisses preview.
+        return true;
       }
       setState(() => _capturedCount++);
       EvidenceUploadFeedback.listenAndReport(
@@ -446,6 +515,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
           );
         },
       );
+      return true;
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -496,22 +566,41 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     }
   }
 
-  Future<void> _acceptPhoto() async {
+  Future<bool> _acceptPhoto() async {
     final path = _photoPreviewPath;
-    if (path == null) return;
-    // Optimistic: close overlay immediately — camera stays active.
+    if (path == null) return true;
+    if (_busy || _acceptInFlight != null) return false;
+
+    if (_isFlutterTest) {
+      if (_debugFailLocalCommit) {
+        _reportAcceptFailure(staleIncident: false);
+        return false;
+      }
+      if (!_operationOwnsBound) {
+        _reportAcceptFailure(staleIncident: true);
+        return false;
+      }
+      widget.controller.preserveForWidgetTest(WorkspaceCaptureMode.photo);
+      _dismissPhotoPreview();
+      if (mounted) setState(() => _capturedCount++);
+      return true;
+    }
+
+    final ok = await _trackAccept(
+      _acceptMedia(mode: WorkspaceCaptureMode.photo, path: path),
+    );
+    if (ok) {
+      _dismissPhotoPreview();
+    }
+    return ok;
+  }
+
+  void _dismissPhotoPreview() {
+    if (!mounted) return;
     setState(() {
       _photoPreviewPath = null;
       _photoPhase = _PhotoPhase.active;
     });
-    if (_isFlutterTest) {
-      widget.controller.preserveForWidgetTest(WorkspaceCaptureMode.photo);
-      if (mounted) setState(() => _capturedCount++);
-      return;
-    }
-    await _trackAccept(
-      _acceptMedia(mode: WorkspaceCaptureMode.photo, path: path),
-    );
   }
 
   Future<void> _discardPhoto() async {
@@ -726,17 +815,26 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
   }
 
   Future<void> _finishVideo() async {
+    if (_busy) return;
     if (_videoPhase != _VideoPhase.recording &&
         _videoPhase != _VideoPhase.paused) {
       return;
     }
     _videoTicker?.cancel();
     if (_isFlutterTest) {
+      final generation = ++_videoPreviewGeneration;
+      final path = 'test://video-$generation';
       setState(() {
-        _videoPreviewPath = 'test://video';
+        _videoPreviewPath = path;
         _videoThumbnailPath = null;
         _videoPhase = _VideoPhase.preview;
       });
+      if (ContinuousCaptureSession.debugGenerateVideoThumbnail != null) {
+        _scheduleVideoPreviewThumbnail(
+          videoPath: path,
+          generation: generation,
+        );
+      }
       return;
     }
     final cam = _camera;
@@ -746,19 +844,16 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
       final file = await cam.stopVideoRecording();
       if (!mounted) return;
       final path = file.path;
-      // Reuse existing preprocess pipeline for a real first-frame JPEG.
-      String? thumb;
-      try {
-        thumb = await MediaPreprocessService.generateVideoThumbnail(path);
-      } catch (error) {
-        debugPrint('[Capture] video thumbnail skipped: $error');
-      }
-      if (!mounted) return;
+      final generation = ++_videoPreviewGeneration;
       setState(() {
         _videoPreviewPath = path;
-        _videoThumbnailPath = thumb;
+        _videoThumbnailPath = null;
         _videoPhase = _VideoPhase.preview;
       });
+      _scheduleVideoPreviewThumbnail(
+        videoPath: path,
+        generation: generation,
+      );
     } catch (error) {
       debugPrint('[Capture] stopVideo failed: $error');
       if (mounted) setState(() => _videoPhase = _VideoPhase.ready);
@@ -767,28 +862,82 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     }
   }
 
-  Future<void> _acceptVideo() async {
+  /// First-frame JPEG is presentation-only. Never gates Preview or Accept.
+  void _scheduleVideoPreviewThumbnail({
+    required String videoPath,
+    required int generation,
+  }) {
+    unawaited(() async {
+      String? thumb;
+      try {
+        final override =
+            ContinuousCaptureSession.debugGenerateVideoThumbnail;
+        thumb = override != null
+            ? await override(videoPath)
+            : await MediaPreprocessService.generateVideoThumbnail(videoPath);
+      } catch (error) {
+        debugPrint('[Capture] video thumbnail skipped: $error');
+      }
+      if (thumb == null || thumb.isEmpty) {
+        return;
+      }
+      if (!mounted ||
+          _videoPhase != _VideoPhase.preview ||
+          _videoPreviewPath != videoPath ||
+          _videoPreviewGeneration != generation) {
+        if (!thumb.startsWith('test://')) {
+          await _deleteIfExists(thumb);
+        }
+        return;
+      }
+      ContinuousCaptureSession.debugLastAttachedVideoThumbnail = thumb;
+      setState(() => _videoThumbnailPath = thumb);
+    }());
+  }
+
+  Future<bool> _acceptVideo() async {
     final path = _videoPreviewPath;
-    if (path == null) return;
+    if (path == null) return true;
+    if (_busy || _acceptInFlight != null) return false;
     final thumb = _videoThumbnailPath;
-    setState(() {
-      _videoPreviewPath = null;
-      _videoThumbnailPath = null;
-      _videoPhase = _VideoPhase.ready;
-      _videoElapsed = Duration.zero;
-    });
+
     if (_isFlutterTest) {
+      if (_debugFailLocalCommit) {
+        _reportAcceptFailure(staleIncident: false);
+        return false;
+      }
+      if (!_operationOwnsBound) {
+        _reportAcceptFailure(staleIncident: true);
+        return false;
+      }
       widget.controller.preserveForWidgetTest(WorkspaceCaptureMode.video);
+      _dismissVideoPreview();
       if (mounted) setState(() => _capturedCount++);
-      return;
+      return true;
     }
-    await _trackAccept(
+
+    final ok = await _trackAccept(
       _acceptMedia(
         mode: WorkspaceCaptureMode.video,
         path: path,
         thumbnailPath: thumb,
       ),
     );
+    if (ok) {
+      _dismissVideoPreview();
+    }
+    return ok;
+  }
+
+  void _dismissVideoPreview() {
+    if (!mounted) return;
+    _videoPreviewGeneration += 1;
+    setState(() {
+      _videoPreviewPath = null;
+      _videoThumbnailPath = null;
+      _videoPhase = _VideoPhase.ready;
+      _videoElapsed = Duration.zero;
+    });
   }
 
   Future<void> _discardVideo() async {
@@ -807,6 +956,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
         }
       }
       if (mounted) {
+        _videoPreviewGeneration += 1;
         setState(() {
           _videoPreviewPath = null;
           _videoThumbnailPath = null;
@@ -818,6 +968,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     }
     final path = _videoPreviewPath;
     final thumb = _videoThumbnailPath;
+    _videoPreviewGeneration += 1;
     setState(() {
       _videoPreviewPath = null;
       _videoThumbnailPath = null;
@@ -891,12 +1042,12 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
   Future<void> _pauseVoice() async {
     if (_voicePhase != _VoicePhase.recording) return;
     _voiceTicker?.cancel();
-    await _ampSub?.cancel();
-    _ampSub = null;
     if (_isFlutterTest) {
       setState(() => _voicePhase = _VoicePhase.paused);
       return;
     }
+    await _ampSub?.cancel();
+    _ampSub = null;
     await AudioCaptureService.pause();
     if (mounted) setState(() => _voicePhase = _VoicePhase.paused);
   }
@@ -907,8 +1058,6 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
       return;
     }
     _voiceTicker?.cancel();
-    await _ampSub?.cancel();
-    _ampSub = null;
     if (_isFlutterTest) {
       setState(() {
         _voicePreviewPath = 'test://voice';
@@ -916,6 +1065,8 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
       });
       return;
     }
+    await _ampSub?.cancel();
+    _ampSub = null;
     final path = await AudioCaptureService.stop();
     if (!mounted) return;
     setState(() {
@@ -924,27 +1075,44 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     });
   }
 
-  Future<void> _acceptVoice() async {
+  Future<bool> _acceptVoice() async {
     final path = _voicePreviewPath;
-    if (path == null) return;
-    if (ContinuousCaptureSession.debugFailVoiceDurability) {
-      return;
-    }
+    if (path == null) return true;
+    if (_busy || _acceptInFlight != null) return false;
     await _stopVoicePreviewPlayback();
+
+    if (_isFlutterTest) {
+      if (_debugFailLocalCommit) {
+        _reportAcceptFailure(staleIncident: false);
+        return false;
+      }
+      if (!_operationOwnsBound) {
+        _reportAcceptFailure(staleIncident: true);
+        return false;
+      }
+      widget.controller.preserveForWidgetTest(WorkspaceCaptureMode.voice);
+      _dismissVoicePreview();
+      if (mounted) setState(() => _capturedCount++);
+      return true;
+    }
+
+    final ok = await _trackAccept(
+      _acceptMedia(mode: WorkspaceCaptureMode.voice, path: path),
+    );
+    if (ok) {
+      _dismissVoicePreview();
+    }
+    return ok;
+  }
+
+  void _dismissVoicePreview() {
+    if (!mounted) return;
     setState(() {
       _voicePreviewPath = null;
       _voicePhase = _VoicePhase.ready;
       _voiceElapsed = Duration.zero;
       _voicePreviewPlaying = false;
     });
-    if (_isFlutterTest) {
-      widget.controller.preserveForWidgetTest(WorkspaceCaptureMode.voice);
-      if (mounted) setState(() => _capturedCount++);
-      return;
-    }
-    await _trackAccept(
-      _acceptMedia(mode: WorkspaceCaptureMode.voice, path: path),
-    );
   }
 
   Future<void> _discardVoice() async {
@@ -1364,13 +1532,14 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
 
   String get _voiceCenterTooltip {
     if (_voicePhase == _VoicePhase.preview) {
-      return _voicePreviewPlaying ? 'Pause preview' : 'Play preview';
+      // Compact [VoicePreviewPanel] owns 'Play preview' / 'Pause preview'.
+      return _voicePreviewPlaying ? 'Pause' : 'Play';
     }
     if (_voicePhase == _VoicePhase.recording) {
       return 'Pause';
     }
     if (_voicePhase == _VoicePhase.paused) {
-      return 'Resume';
+      return 'Play';
     }
     return 'Record';
   }

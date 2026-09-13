@@ -15,8 +15,16 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    // AGP 8+/9 do not generate BuildConfig unless opted in. EvLog.kt
+    // gates debug logging on the app-module BuildConfig.DEBUG field.
+    buildFeatures {
+        buildConfig = true
+    }
+
     defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
+        // Bound to the Firebase Android app in google-services.json /
+        // firebase_options.dart. Do not change without registering a new
+        // Android app in Firebase Console and replacing google-services.json.
         applicationId = "com.example.evidence_vault"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
@@ -29,9 +37,13 @@ android {
 
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
+            isDebuggable = false
+            // NOT a production signing config. Debug keys let `flutter run
+            // --release` work locally. Do not distribute this APK. Add a
+            // release keystore via env/local properties — never commit secrets.
             signingConfig = signingConfigs.getByName("debug")
+            // R8/minify deferred: requires a dedicated ProGuard pass for
+            // Firebase/Flutter plugins before it is safe to enable.
         }
     }
 }

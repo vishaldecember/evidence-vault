@@ -1,3 +1,4 @@
+import '../security/https_preview_url.dart';
 import 'verification_model.dart';
 import 'workspace_evidence_item.dart';
 
@@ -111,10 +112,7 @@ class EvidenceArtifactModel {
     return null;
   }
 
-  static bool _isNetworkUrl(String path) {
-    final lower = path.toLowerCase();
-    return lower.startsWith('http://') || lower.startsWith('https://');
-  }
+  static bool _isNetworkUrl(String path) => isHttpsPreviewUrl(path);
 
   static bool _looksLikeImagePath(String path) {
     final lower = path.toLowerCase();

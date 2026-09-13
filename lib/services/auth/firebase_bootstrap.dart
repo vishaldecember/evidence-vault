@@ -1,3 +1,4 @@
+import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -27,6 +28,8 @@ abstract final class FirebaseBootstrap {
       );
       _available = true;
 
+      await _activateAppCheck();
+
       try {
         await GoogleSignIn.instance.initialize();
       } catch (error) {
@@ -48,6 +51,32 @@ abstract final class FirebaseBootstrap {
     }
 
     return _available;
+  }
+
+  /// Client App Check tokens. Enforcement is a Firebase Console setting and
+  /// is **not** verified here (REQUIRES DEVICE/CONSOLE VERIFICATION).
+  /// Debug provider keeps local/emulator development working.
+  static Future<void> _activateAppCheck() async {
+    try {
+      await FirebaseAppCheck.instance.activate(
+        providerAndroid: kDebugMode
+            ? const AndroidDebugProvider()
+            : const AndroidPlayIntegrityProvider(),
+        providerApple: kDebugMode
+            ? const AppleDebugProvider()
+            : const AppleAppAttestWithDeviceCheckFallbackProvider(),
+      );
+      if (kDebugMode) {
+        debugPrint(
+          'Firebase App Check client activated '
+          '(enforcement is Console-only).',
+        );
+      }
+    } catch (error) {
+      if (kDebugMode) {
+        debugPrint('Firebase App Check activation skipped: $error');
+      }
+    }
   }
 
   /// Resets bootstrap state for tests.

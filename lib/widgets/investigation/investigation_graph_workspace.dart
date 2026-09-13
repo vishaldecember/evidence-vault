@@ -9,6 +9,8 @@ import '../../services/investigation/spatial_graph_layout.dart';
 import '../../services/relationship/relationship_engine.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../../utils/evidence_formatters.dart';
+import 'gps_coordinate_title_box.dart';
 import 'investigation_evidence_mark.dart';
 
 /// Graph-owned evidence label colors. Independent of Organize typography.
@@ -47,6 +49,9 @@ class InvestigationGraphWorkspace extends StatefulWidget {
       Key('investigation_graph_gap_${fromId}_$label');
   static Key locationUncertainKey(String id) =>
       Key('investigation_graph_location_uncertain_$id');
+  static const Key gpsCoordinateTitleKey = Key(
+    'investigation_graph_gps_coordinate_title',
+  );
 
   static const Color chronologyColor = AppColors.timelineChronology;
   static const Color locationPinColor = Color(0xFFE53935);
@@ -70,6 +75,7 @@ class _InvestigationGraphWorkspaceState
     extends State<InvestigationGraphWorkspace> {
   final TransformationController _transform = TransformationController();
   String? _centeredSignature;
+  String? _revealedLocationNodeId;
 
   @override
   void dispose() {
@@ -92,6 +98,41 @@ class _InvestigationGraphWorkspaceState
     final matrix = Matrix4.identity();
     matrix.setTranslationRaw(dx, 0, 0);
     _transform.value = matrix;
+  }
+
+  WorkspaceEvidenceItem? _evidenceForLocation(SpatialGraphNode node) {
+    final evidenceId = node.evidenceId;
+    if (evidenceId == null) {
+      return null;
+    }
+    return widget.graph.evidenceById[evidenceId];
+  }
+
+  String? _coordinatesFor(SpatialGraphNode node) {
+    final item = _evidenceForLocation(node);
+    if (item == null || item.latitude == null || item.longitude == null) {
+      return null;
+    }
+    return EvidenceFormatters.coordinates(item.latitude, item.longitude);
+  }
+
+  void _dismissLocationCoordinates() {
+    if (_revealedLocationNodeId == null) {
+      return;
+    }
+    setState(() => _revealedLocationNodeId = null);
+  }
+
+  void _toggleLocationCoordinates(SpatialGraphNode node) {
+    if (_coordinatesFor(node) == null) {
+      _dismissLocationCoordinates();
+      return;
+    }
+    setState(() {
+      _revealedLocationNodeId = _revealedLocationNodeId == node.id
+          ? null
+          : node.id;
+    });
   }
 
   @override
@@ -188,6 +229,13 @@ class _InvestigationGraphWorkspaceState
                         ),
                       ),
                     ),
+                  if (_revealedLocationNodeId != null)
+                    Positioned.fill(
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onTap: _dismissLocationCoordinates,
+                      ),
+                    ),
                   for (final node in layout.nodes)
                     Positioned(
                       key: InvestigationGraphWorkspace.nodeKey(node.id),
@@ -197,6 +245,11 @@ class _InvestigationGraphWorkspaceState
                       child: _GraphNodeChip(
                         node: node,
                         onTap: () {
+                          if (node.kind == SpatialGraphNodeKind.location) {
+                            _toggleLocationCoordinates(node);
+                            return;
+                          }
+                          _dismissLocationCoordinates();
                           final evidenceId = node.evidenceId;
                           if (evidenceId == null) {
                             return;
@@ -208,6 +261,8 @@ class _InvestigationGraphWorkspaceState
                         },
                       ),
                     ),
+                  if (_revealedLocationNodeId != null)
+                    ..._gpsCoordinateTitle(layout),
                 ],
               ),
             ),
@@ -215,6 +270,48 @@ class _InvestigationGraphWorkspaceState
         );
       },
     );
+  }
+
+  List<Widget> _gpsCoordinateTitle(SpatialGraphLayout layout) {
+    final nodeId = _revealedLocationNodeId;
+    if (nodeId == null) {
+      return const [];
+    }
+    SpatialGraphNode? node;
+    for (final candidate in layout.nodes) {
+      if (candidate.id == nodeId) {
+        node = candidate;
+        break;
+      }
+    }
+    if (node == null) {
+      return const [];
+    }
+    final coordinates = _coordinatesFor(node);
+    if (coordinates == null) {
+      return const [];
+    }
+    final pin = SpatialGraphLayout.nodeBox(node);
+    const boxHeight = 30.0;
+    const boxMaxWidth = 268.0;
+    final left = (pin.center.dx - 96).clamp(
+      8.0,
+      math.max(8.0, layout.size.width - boxMaxWidth - 8),
+    ).toDouble();
+    var top = pin.top - boxHeight - 6;
+    if (top < 4) {
+      top = 4;
+    }
+    return [
+      Positioned(
+        key: InvestigationGraphWorkspace.gpsCoordinateTitleKey,
+        left: left,
+        top: top,
+        child: IgnorePointer(
+          child: GpsCoordinateTitleBox(coordinates: coordinates),
+        ),
+      ),
+    ];
   }
 }
 
@@ -244,66 +341,77 @@ class _GraphNodeChip extends StatelessWidget {
         ? 18.0
         : 28.0;
     if (isLocation) {
+      final isGpsCoordinateLabel =
+          node.locationKey?.startsWith('geo:') ?? false;
+      final pinLabel = isGpsCoordinateLabel ? '' : node.label;
       return Semantics(
-        label: node.locationUncertain && node.label.isNotEmpty
-            ? '${node.label} uncertain'
+        button: true,
+        label: node.locationUncertain && pinLabel.isNotEmpty
+            ? '$pinLabel uncertain'
             : node.locationUncertain
             ? 'Uncertain location'
-            : node.label,
-        child: SizedBox(
-          width: SpatialGraphLayout.nodeBox(node).width,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SizedBox(
-                width: markSize + 8,
-                height: markSize,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      Icons.place_rounded,
-                      key: InvestigationGraphWorkspace.nodeMarkKey(node.id),
-                      size: markSize,
-                      color: InvestigationGraphWorkspace.locationPinColor,
-                    ),
-                    if (node.locationUncertain)
-                      Positioned(
-                        right: -1,
-                        top: -2,
-                        child: Text(
-                          '?',
-                          key: InvestigationGraphWorkspace.locationUncertainKey(
-                            node.id,
-                          ),
-                          style: AppTextStyles.caption.copyWith(
-                            color: AppColors.onCanvasSecondary,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            height: 1,
+            : pinLabel.isEmpty
+            ? 'GPS location'
+            : pinLabel,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: onTap,
+          child: SizedBox(
+            width: SpatialGraphLayout.nodeBox(node).width,
+            height: SpatialGraphLayout.nodeBox(node).height,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SizedBox(
+                  width: markSize + 8,
+                  height: markSize,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(
+                        Icons.place_rounded,
+                        key: InvestigationGraphWorkspace.nodeMarkKey(node.id),
+                        size: markSize,
+                        color: InvestigationGraphWorkspace.locationPinColor,
+                      ),
+                      if (node.locationUncertain)
+                        Positioned(
+                          right: -1,
+                          top: -2,
+                          child: Text(
+                            '?',
+                            key: InvestigationGraphWorkspace.locationUncertainKey(
+                              node.id,
+                            ),
+                            style: AppTextStyles.caption.copyWith(
+                              color: AppColors.onCanvasSecondary,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w700,
+                              height: 1,
+                            ),
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              if (node.label.isNotEmpty) ...[
-                const SizedBox(height: 1),
-                Text(
-                  node.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.center,
-                  style: AppTextStyles.caption.copyWith(
-                    color: AppColors.onCanvas,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 8,
-                    height: 1.05,
+                    ],
                   ),
                 ),
+                if (pinLabel.isNotEmpty) ...[
+                  const SizedBox(height: 1),
+                  Text(
+                    pinLabel,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: AppTextStyles.caption.copyWith(
+                      color: AppColors.onCanvas,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 8,
+                      height: 1.05,
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );

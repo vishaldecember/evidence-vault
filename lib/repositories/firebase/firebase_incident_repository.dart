@@ -160,6 +160,10 @@ class FirebaseIncidentRepository {
     debugPrint('[Firestore] active incident set → $incidentId');
   }
 
+  /// Returns the active or latest incident, creating an empty draft if none exist.
+  ///
+  /// Restore/hydration must not call this. Use [loadIncident] / [loadLatestIncident]
+  /// so a missing incident stays missing instead of minting a cloud document.
   Future<Incident> ensureIncident({
     required String userId,
     Incident? seed,
@@ -258,30 +262,40 @@ class FirebaseIncidentRepository {
     }
   }
 
-  /// Deletes every incident document for [userId] and clears activeIncidentId.
+  /// Incident document IDs under `users/{userId}/incidents`.
+  Future<List<String>> listIncidentIds(String userId) async {
+    if (userId.isEmpty) {
+      return const [];
+    }
+    final query = await _incidents(userId).get();
+    return [for (final doc in query.docs) doc.id];
+  }
+
+  /// Deletes every owned incident tree, Vault collections, and active pointer.
   ///
-  /// Used by Clear Vault so Library/refresh cannot resurrect old titles.
+  /// Used by Clear Vault / Delete Account. Does **not** delete Storage objects;
+  /// the caller must wipe Storage prefixes using [listIncidentIds] first.
   Future<void> deleteAllIncidentsForUser(String userId) async {
     if (userId.isEmpty) {
       return;
     }
     final query = await _incidents(userId).get();
-    final batch = _db.batch();
     for (final doc in query.docs) {
-      batch.delete(doc.reference);
+      await deleteOwnedIncidentTree(userId: userId, incidentId: doc.id);
     }
-    batch.set(
-      _userDoc(userId),
+    await _deleteCollectionDocs(FirestorePaths.incidentCollections(userId));
+    await _userDoc(userId).set(
       {
         'activeIncidentId': FieldValue.delete(),
         'updatedAt': DateTime.now().toIso8601String(),
       },
       SetOptions(merge: true),
     );
-    await batch.commit();
-    debugPrint(
-      '[Firestore] deleted ${query.docs.length} incidents for user=$userId',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[Firestore] deleted ${query.docs.length} owned incident trees',
+      );
+    }
   }
 }
 

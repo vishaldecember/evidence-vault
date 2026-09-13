@@ -6,8 +6,11 @@ import '../../domain/evidence/evidence_integrity.dart';
 import '../../domain/evidence/evidence_provenance_event.dart';
 import '../../domain/evidence/evidence_record_type.dart';
 import '../../domain/evidence/evidence_sync_status.dart';
+import '../../models/evidence_device.dart';
+import '../../models/evidence_location.dart';
 import '../../models/workspace_capture_mode.dart';
 import '../../presentation/evidence_inspector_semantics.dart';
+import 'capture_provenance.dart';
 import '../../models/verification_factory.dart';
 import '../../models/workspace_evidence_item.dart';
 import '../storage/capture_media_service.dart';
@@ -48,6 +51,21 @@ class CaptureEngine {
   CaptureEngine._();
 
   static final CaptureEngine instance = CaptureEngine._();
+
+  static final Set<String> _hashInFlight = <String>{};
+  static final List<Future<void>> _backgroundWork = <Future<void>>[];
+
+  /// Completes in-flight hash / GPS attach jobs. Tests only.
+  @visibleForTesting
+  static Future<void> waitForBackgroundWork() {
+    return Future.wait(_backgroundWork.toList());
+  }
+
+  @visibleForTesting
+  static void resetForTests() {
+    _hashInFlight.clear();
+    _backgroundWork.clear();
+  }
 
   bool _sessionMatchesStart(CapturePipelineHost host, String incidentIdAtStart) {
     return incidentIdAtStart.isNotEmpty &&
@@ -113,23 +131,13 @@ class CaptureEngine {
       );
     }
 
-    final provenanceFuture = MetadataService.collectAtCapture();
     final evidenceId = createLocalEvidence(captureSessionId);
-    final provenance = await provenanceFuture;
-    final deviceName = provenance.device.name.trim();
-    final provenanceMetadata = <String, String>{
-      if (deviceName.isNotEmpty) 'deviceModel': deviceName,
-      if (provenance.location.latitude != null)
-        'latitude': '${provenance.location.latitude}',
-      if (provenance.location.longitude != null)
-        'longitude': '${provenance.location.longitude}',
-    };
-    host.rememberCaptureProvenance(provenance);
-    host.applyCaptureProvenance(
-      evidenceId: evidenceId,
-      deviceModel: deviceName.isEmpty ? null : deviceName,
-      latitude: provenance.location.latitude,
-      longitude: provenance.location.longitude,
+    host.rememberCaptureProvenance(
+      const CaptureProvenanceSnapshot(
+        device: EvidenceDevice(name: '', platform: ''),
+        location: EvidenceLocation(),
+        locationStatus: CaptureLocationStatus.skipped,
+      ),
     );
     final capturedAt = DateTime.now().toUtc();
     host.appendEvidenceProvenance(
@@ -138,9 +146,9 @@ class CaptureEngine {
         evidenceId: evidenceId,
         at: capturedAt,
         captureModality: _modalityFor(mode),
-        source: deviceName.isEmpty ? null : deviceName,
       ),
     );
+    _scheduleProvenanceAttach(host: host, evidenceId: evidenceId);
     if (isFile) {
       FileP0Trace.step(
         'EVIDENCE_CREATED',
@@ -253,15 +261,6 @@ class CaptureEngine {
         thumbnailPath: committed.thumbnailPath,
         fileSizeBytes: committed.fileSizeBytes,
       );
-      String? contentHash;
-      try {
-        contentHash = await EvidenceIntegrity.sha256OfFile(committed.localPath);
-        host.recordContentHash(evidenceId: evidenceId, hash: contentHash);
-      } catch (error) {
-        debugPrint(
-          '[Integrity] Evidence $evidenceId SHA-256 failed: $error',
-        );
-      }
       final preservedAt = DateTime.now().toUtc();
       host.appendEvidenceProvenance(
         EvidenceProvenanceEvent(
@@ -269,10 +268,13 @@ class CaptureEngine {
           evidenceId: evidenceId,
           at: preservedAt,
           captureModality: _modalityFor(mode),
-          source: deviceName.isEmpty ? null : deviceName,
-          contentHash: contentHash,
           storageReference: committed.localPath,
         ),
+      );
+      _scheduleFileHash(
+        host: host,
+        evidenceId: evidenceId,
+        localPath: committed.localPath,
       );
       host.scheduleCaptureMetadataPersist();
       if (isFile) {
@@ -299,12 +301,10 @@ class CaptureEngine {
         capturedAt: DateTime.now().toUtc(),
         mode: mode,
         media: committed,
-        hash: contentHash,
         metadata: {
           if (mimeType != null && mimeType.isNotEmpty) 'mimeType': mimeType,
           if (captureSessionId != null && captureSessionId.isNotEmpty)
             'captureSessionId': captureSessionId,
-          ...provenanceMetadata,
           ...EvidenceProvenanceEvent.toMetadata(
             [
               EvidenceProvenanceEvent(
@@ -312,15 +312,12 @@ class CaptureEngine {
                 evidenceId: evidenceId,
                 at: capturedAt,
                 captureModality: _modalityFor(mode),
-                source: deviceName.isEmpty ? null : deviceName,
               ),
               EvidenceProvenanceEvent(
                 type: EvidenceProvenanceType.preserved,
                 evidenceId: evidenceId,
                 at: preservedAt,
                 captureModality: _modalityFor(mode),
-                source: deviceName.isEmpty ? null : deviceName,
-                contentHash: contentHash,
                 storageReference: committed.localPath,
               ),
             ],
@@ -377,7 +374,6 @@ class CaptureEngine {
           evidenceId: evidenceId,
           at: preservedAt,
           captureModality: _modalityFor(mode),
-          source: deviceName.isEmpty ? null : deviceName,
           contentHash: contentHash,
         ),
       );
@@ -391,7 +387,6 @@ class CaptureEngine {
         mimeType: mimeType,
         hash: contentHash,
         metadata: {
-          ...provenanceMetadata,
           ...EvidenceProvenanceEvent.toMetadata(
             [
               EvidenceProvenanceEvent(
@@ -399,14 +394,12 @@ class CaptureEngine {
                 evidenceId: evidenceId,
                 at: capturedAt,
                 captureModality: _modalityFor(mode),
-                source: deviceName.isEmpty ? null : deviceName,
               ),
               EvidenceProvenanceEvent(
                 type: EvidenceProvenanceType.preserved,
                 evidenceId: evidenceId,
                 at: preservedAt,
                 captureModality: _modalityFor(mode),
-                source: deviceName.isEmpty ? null : deviceName,
                 contentHash: contentHash,
               ),
             ],
@@ -431,6 +424,87 @@ class CaptureEngine {
     }
 
     return evidenceId;
+  }
+
+  void _trackBackground(Future<void> work) {
+    _backgroundWork.add(work);
+    work.whenComplete(() {
+      _backgroundWork.remove(work);
+    });
+  }
+
+  void _scheduleProvenanceAttach({
+    required CapturePipelineHost host,
+    required String evidenceId,
+  }) {
+    _trackBackground(() async {
+      try {
+        final provenance = await MetadataService.collectAtCapture();
+        host.rememberCaptureProvenance(provenance);
+        final deviceName = provenance.device.name.trim();
+        host.applyCaptureProvenance(
+          evidenceId: evidenceId,
+          deviceModel: deviceName.isEmpty ? null : deviceName,
+          latitude: provenance.location.latitude,
+          longitude: provenance.location.longitude,
+        );
+        host.scheduleCaptureMetadataPersist();
+        final existing = await LocalEvidenceCache.byId(evidenceId);
+        if (existing == null) {
+          return;
+        }
+        final next = <String, String>{
+          ...existing.metadata,
+          if (deviceName.isNotEmpty) 'deviceModel': deviceName,
+          if (provenance.location.latitude != null)
+            'latitude': '${provenance.location.latitude}',
+          if (provenance.location.longitude != null)
+            'longitude': '${provenance.location.longitude}',
+        };
+        if (next.length == existing.metadata.length &&
+            next.entries.every(
+              (entry) => existing.metadata[entry.key] == entry.value,
+            )) {
+          return;
+        }
+        await LocalEvidenceCache.upsert(existing.copyWith(metadata: next));
+      } catch (error) {
+        debugPrint('[CaptureEngine] provenance attach failed: $error');
+      }
+    }());
+  }
+
+  void _scheduleFileHash({
+    required CapturePipelineHost host,
+    required String evidenceId,
+    required String localPath,
+  }) {
+    if (!_hashInFlight.add(evidenceId)) {
+      return;
+    }
+    _trackBackground(() async {
+      try {
+        final hash = await EvidenceIntegrity.sha256OfFile(localPath);
+        if (hash.isEmpty) {
+          return;
+        }
+        host.recordContentHash(evidenceId: evidenceId, hash: hash);
+        final existing = await LocalEvidenceCache.byId(evidenceId);
+        if (existing != null) {
+          await LocalEvidenceCache.updateStatus(
+            evidenceId: evidenceId,
+            syncStatus: existing.syncStatus,
+            hash: hash,
+          );
+        }
+      } catch (error) {
+        debugPrint(
+          '[Integrity] Evidence $evidenceId SHA-256 failed: $error',
+        );
+      } finally {
+        _hashInFlight.remove(evidenceId);
+      }
+    }());
   }
 
   static String _modalityFor(WorkspaceCaptureMode mode) {

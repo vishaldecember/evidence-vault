@@ -47,18 +47,3 @@ Widget buildPageTransition(
     ),
   );
 }
-
-/// Subtle cross-fade for shell tab changes — preserves child state.
-Widget buildTabCrossFade({
-  required Animation<double> animation,
-  required Widget child,
-}) {
-  return FadeTransition(
-    opacity: CurvedAnimation(
-      parent: animation,
-      curve: AppMotion.enter,
-      reverseCurve: AppMotion.exit,
-    ),
-    child: child,
-  );
-}

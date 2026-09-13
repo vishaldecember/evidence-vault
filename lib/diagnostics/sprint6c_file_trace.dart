@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
@@ -35,7 +36,9 @@ abstract final class Sprint6cFileTrace {
   }
 
   static void _log(String prefix, String message) {
-    // Temporary Task 6C: always emit so real-device logcat works in debug/profile.
+    if (!kDebugMode) {
+      return;
+    }
     final ts = DateTime.now().toIso8601String();
     debugPrint('[$prefix] $ts | $message | ${snapshot()}');
   }

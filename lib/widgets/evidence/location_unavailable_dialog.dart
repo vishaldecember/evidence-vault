@@ -119,7 +119,7 @@ class _LocationUnavailableDialog extends StatelessWidget {
       ),
       title: Text('Location unavailable', style: AppTextStyles.heading),
       content: const Text(
-        "Evidence Vault couldn't capture your location for this moment.",
+        "My Truth couldn't capture your location for this moment.",
         style: AppTextStyles.bodySmall,
       ),
       actions: [

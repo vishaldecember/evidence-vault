@@ -2,8 +2,17 @@
 <!-- Exclude plaintext evidence from Android Auto Backup. Other app data may
      still back up. Evidence Vault does not application-encrypt local files. -->
 <full-backup-content>
+    <!-- Flutter documents (path_provider app_flutter / filesDir layouts). -->
     <exclude domain="file" path="evidence_cache" />
     <exclude domain="file" path="trust_package_exports" />
+    <exclude domain="file" path="evidence" />
+    <exclude domain="file" path="evidence_records.json" />
+    <exclude domain="file" path="attach_staging" />
     <exclude domain="root" path="app_flutter/evidence_cache" />
     <exclude domain="root" path="app_flutter/trust_package_exports" />
+    <exclude domain="root" path="app_flutter/evidence" />
+    <exclude domain="root" path="app_flutter/evidence_records.json" />
+    <exclude domain="root" path="app_flutter/attach_staging" />
+    <!-- Upload/sync queues may contain localFilePath and GPS. -->
+    <exclude domain="sharedpref" path="FlutterSharedPreferences.xml" />
 </full-backup-content>

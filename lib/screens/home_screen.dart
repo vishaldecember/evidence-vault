@@ -1,3 +1,6 @@
+import 'dart:io' show Platform;
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../controllers/workspace_evidence_controller.dart';
@@ -39,6 +42,57 @@ class HomeScreen extends StatelessWidget {
         mode == WorkspaceCaptureMode.voice;
   }
 
+  static bool get _isFlutterTest =>
+      !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
+
+  /// Home Capture Now launch lock. Prevents a second Photo/Video/Voice/Note/File
+  /// tap from minting Incident B while the first launch is still binding.
+  static bool _captureNowLaunching = false;
+
+  @visibleForTesting
+  static bool get captureNowLaunchInFlight => _captureNowLaunching;
+
+  @visibleForTesting
+  static int debugBeginNewCaptureIncidentCount = 0;
+
+  /// Completes after the launch lock is acquired and before a new incident.
+  @visibleForTesting
+  static Future<void> Function()? debugAfterCaptureNowLockAcquired;
+
+  /// Test stand-in for [CaptureCockpitScreen.open] (no camera). Must invoke
+  /// [onOpened] when the launch has handed off, matching production.
+  @visibleForTesting
+  static Future<void> Function({
+    required BuildContext context,
+    required WorkspaceCaptureMode mode,
+    required VoidCallback onOpened,
+  })? debugCockpitOpenOverride;
+
+  /// Test stand-in for the Note sheet.
+  @visibleForTesting
+  static Future<String?> Function(BuildContext context)? debugOpenNoteForTests;
+
+  @visibleForTesting
+  static void resetCaptureNowLaunchForTests() {
+    _captureNowLaunching = false;
+    debugBeginNewCaptureIncidentCount = 0;
+    debugAfterCaptureNowLockAcquired = null;
+    debugCockpitOpenOverride = null;
+    debugOpenNoteForTests = null;
+  }
+
+  static bool _tryBeginCaptureNowLaunch() {
+    if (_captureNowLaunching) {
+      return false;
+    }
+    _captureNowLaunching = true;
+    return true;
+  }
+
+  static void _endCaptureNowLaunch() {
+    _captureNowLaunching = false;
+  }
+
   /// Capture Now — always a new incident.
   ///
   /// Photo/Video/Voice/Note: Workspace opens only after evidence is created;
@@ -49,99 +103,164 @@ class HomeScreen extends StatelessWidget {
   Future<void> _handleCaptureTap(
     BuildContext context,
     QuickCaptureType type,
+  ) {
+    return handleCaptureNowTap(context, type);
+  }
+
+  /// Home Capture Now entry. Acquires the in-flight launch lock before minting
+  /// an incident so a rapid second tap cannot create or bind Incident B.
+  @visibleForTesting
+  static Future<void> handleCaptureNowTap(
+    BuildContext context,
+    QuickCaptureType type,
   ) async {
+    if (!_tryBeginCaptureNowLaunch()) {
+      return;
+    }
+    var releaseInFinally = true;
     final session = WorkspaceSession.instance;
     final manager = CaptureSessionManager.instance;
     final userId = UserSessionService.account?.userId ?? '';
     final mode = type.workspaceMode;
     final controller = session.controller;
 
-    await session.beginNewCaptureIncident();
-    await manager.getOrCreateActiveSession(
-      incidentId: controller.currentIncident.id,
-      userId: userId,
-    );
-    // File attach must continue even if Home BuildContext unmounted during
-    // session create (SAF / shell rebuild). Other modalities still need UI.
-    if (!context.mounted && mode != WorkspaceCaptureMode.file) {
-      return;
-    }
-
-    final evidenceBefore = controller.currentIncident.evidenceCount;
-
-    if (_isCockpitModality(mode)) {
-      await CaptureCockpitScreen.open(
-        context,
-        initialMode: mode,
-        controller: controller,
-        boundIncidentId: controller.currentIncident.id,
-      );
-      if (!context.mounted) {
+    try {
+      await debugAfterCaptureNowLockAcquired?.call();
+      debugBeginNewCaptureIncidentCount++;
+      await session.beginNewCaptureIncident();
+      // File attach must continue even if Home BuildContext unmounted during
+      // session create (SAF / shell rebuild). Other modalities still need UI.
+      if (!context.mounted && mode != WorkspaceCaptureMode.file) {
         return;
       }
-      await finishCaptureNowAfterUi(
-        context: context,
-        session: session,
-        evidenceBefore: evidenceBefore,
-      );
-      return;
-    }
 
-    if (mode == WorkspaceCaptureMode.file) {
-      final sourceIncidentId = controller.currentIncident.id;
-      // Do NOT abort on !mounted after incident create — SAF/async can unmount
-      // Home without cancelling the attach. The transaction is context-free.
-      final result = await FileAttachFlow.attach(
-        origin: FileAttachOrigin.homeCaptureNow,
-        context: context.mounted ? context : null,
-        buildWorkspace: () => ContinuousCaptureScreen(
-          controller: WorkspaceSession.instance.controller,
-        ),
-      );
-      if (result.outcome == FileAttachOutcome.failed) {
-        final msg = result.userMessage ??
-            'Couldn’t attach that file. Try again.';
-        final snackCtx = context.mounted
-            ? context
-            : appNavigatorKey.currentContext;
-        if (snackCtx != null && snackCtx.mounted) {
-          AppSnackBar.showError(snackCtx, msg);
+      // Reset leftover Evidence / Organize / Investigate BEFORE any route that
+      // reads methodology stage. Shared by Photo / Video / Voice / Note / File.
+      session.enterCapture();
+
+      if (_isCockpitModality(mode) &&
+          debugCockpitOpenOverride == null &&
+          _isFlutterTest) {
+        // Widget tests have no camera. Open Capture-stage workspace immediately
+        // so leftover Evidence cannot paint under a pending session/cockpit await.
+        controller.preserveForWidgetTest(mode);
+        releaseInFinally = false;
+        _endCaptureNowLaunch();
+        if (context.mounted) {
+          await AppNavigation.openIncidentWorkspace(context);
+        }
+        return;
+      }
+
+      // Photo/Video/Voice: incident is bound. Do not await session I/O
+      // before Cockpit — session persist overlaps CameraX initialize.
+      if (!_isCockpitModality(mode)) {
+        await manager.getOrCreateActiveSession(
+          incidentId: controller.currentIncident.id,
+          userId: userId,
+        );
+        if (!context.mounted && mode != WorkspaceCaptureMode.file) {
+          return;
         }
       }
-      // Workspace was ensured inside attach() without awaiting route pop.
-      // Incident lock: result.sourceIncidentId must match created incident.
-      assert(
-        result.sourceIncidentId == sourceIncidentId ||
-            result.outcome != FileAttachOutcome.succeeded,
-        'File attach must keep the Capture Now incident',
-      );
-      return;
-    }
 
-    if (mode == WorkspaceCaptureMode.note) {
-      final outcome = await captureNowNoteOrFile(
-        context: context,
-        mode: mode,
-        controller: controller,
-      );
-      if (!context.mounted) {
-        return;
-      }
-      if (outcome == CaptureNowOutcome.succeeded) {
-        await AppNavigation.openContinuousCapture(context);
-        return;
-      }
-      if (outcome == CaptureNowOutcome.failed && context.mounted) {
-        AppSnackBar.showError(
-          context,
-          'Couldn’t save that note. Try again.',
+      final evidenceBefore = controller.currentIncident.evidenceCount;
+
+      if (_isCockpitModality(mode)) {
+        void handOffLaunch() {
+          releaseInFinally = false;
+          _endCaptureNowLaunch();
+        }
+
+        if (debugCockpitOpenOverride != null) {
+          await debugCockpitOpenOverride!(
+            context: context,
+            mode: mode,
+            onOpened: handOffLaunch,
+          );
+        } else {
+          await CaptureCockpitScreen.open(
+            context,
+            initialMode: mode,
+            controller: controller,
+            boundIncidentId: controller.currentIncident.id,
+            onOpened: handOffLaunch,
+          );
+        }
+        if (!context.mounted) {
+          return;
+        }
+        await finishCaptureNowAfterUi(
+          context: context,
+          session: session,
+          evidenceBefore: evidenceBefore,
         );
+        return;
       }
-      await session.abandonEmptyCaptureNow();
-      return;
-    }
 
-    await session.abandonEmptyCaptureNow();
+      if (mode == WorkspaceCaptureMode.file) {
+        final sourceIncidentId = controller.currentIncident.id;
+        // Do NOT abort on !mounted after incident create — SAF/async can unmount
+        // Home without cancelling the attach. The transaction is context-free.
+        final result = await FileAttachFlow.attach(
+          origin: FileAttachOrigin.homeCaptureNow,
+          context: context.mounted ? context : null,
+          buildWorkspace: () => ContinuousCaptureScreen(
+            controller: WorkspaceSession.instance.controller,
+          ),
+        );
+        if (result.outcome == FileAttachOutcome.failed) {
+          final msg = result.userMessage ??
+              'Couldn’t attach that file. Try again.';
+          final snackCtx = context.mounted
+              ? context
+              : appNavigatorKey.currentContext;
+          if (snackCtx != null && snackCtx.mounted) {
+            AppSnackBar.showError(snackCtx, msg);
+          }
+        }
+        // Workspace was ensured inside attach() without awaiting route pop.
+        // Incident lock: result.sourceIncidentId must match created incident.
+        assert(
+          result.sourceIncidentId == sourceIncidentId ||
+              result.outcome != FileAttachOutcome.succeeded,
+          'File attach must keep the Capture Now incident',
+        );
+        return;
+      }
+
+      if (mode == WorkspaceCaptureMode.note) {
+        final outcome = await captureNowNoteOrFile(
+          context: context,
+          mode: mode,
+          controller: controller,
+          openNote: debugOpenNoteForTests,
+        );
+        releaseInFinally = false;
+        _endCaptureNowLaunch();
+        if (!context.mounted) {
+          return;
+        }
+        if (outcome == CaptureNowOutcome.succeeded) {
+          await AppNavigation.openContinuousCapture(context);
+          return;
+        }
+        if (outcome == CaptureNowOutcome.failed && context.mounted) {
+          AppSnackBar.showError(
+            context,
+            'Couldn’t save that note. Try again.',
+          );
+        }
+        await session.abandonEmptyCaptureNow();
+        return;
+      }
+
+      await session.abandonEmptyCaptureNow();
+    } finally {
+      if (releaseInFinally) {
+        _endCaptureNowLaunch();
+      }
+    }
   }
 
   /// Opens Workspace only when Capture Now produced evidence; else stays Home.

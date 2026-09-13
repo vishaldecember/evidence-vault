@@ -79,30 +79,27 @@ class CaptureCockpitScreen extends StatefulWidget {
 
   /// Pushes Capture Cockpit. Does not begin a new incident — callers own
   /// incident identity ([HomeScreen] Capture Now or Workspace sticky bar).
+  ///
+  /// Pushes as soon as the bound incident id is known. Capture-session
+  /// persist/resume runs inside the route ([_ensureInternalSession]) so
+  /// CameraX [ContinuousCaptureSession] initialize can overlap the transition.
+  ///
+  /// [onOpened] fires once the Cockpit route has been pushed, before this
+  /// Future completes on pop. Home Capture Now uses it to release the launch
+  /// lock without holding it for the whole recording.
   static Future<void> open(
     BuildContext context, {
     WorkspaceCaptureMode? initialMode,
     WorkspaceEvidenceController? controller,
     String? boundIncidentId,
+    VoidCallback? onOpened,
   }) async {
-    final session = WorkspaceSession.instance;
-    final manager = CaptureSessionManager.instance;
-    final userId = UserSessionService.account?.userId ?? '';
-    final evidence = controller ?? session.controller;
+    final evidence = controller ?? WorkspaceSession.instance.controller;
 
     final boundIncidentIdAtStart =
         (boundIncidentId ?? evidence.currentIncident.id).trim();
-    final incidentId = boundIncidentIdAtStart;
-    final open = manager.getOpenSession(incidentId);
-    if (open?.status == CaptureSessionStatus.paused) {
-      await manager.resumeSession(sessionId: open!.id);
-    } else {
-      await manager.getOrCreateActiveSession(
-        incidentId: incidentId,
-        userId: userId,
-      );
-    }
-    if (!context.mounted) {
+    if (boundIncidentIdAtStart.isEmpty) {
+      debugPrint('[Nav] CaptureCockpit open rejected — empty incidentId');
       return;
     }
     if (!InvestigateIncidentScope.sessionMatchesBound(
@@ -111,7 +108,10 @@ class CaptureCockpitScreen extends StatefulWidget {
     )) {
       return;
     }
-    await Navigator.of(context).push<void>(
+    if (!context.mounted) {
+      return;
+    }
+    final opened = Navigator.of(context).push<void>(
       MaterialPageRoute(
         fullscreenDialog: true,
         builder: (_) => CaptureCockpitScreen(
@@ -121,6 +121,8 @@ class CaptureCockpitScreen extends StatefulWidget {
         ),
       ),
     );
+    onOpened?.call();
+    await opened;
   }
 
   static WorkspaceCaptureMode resolveInitialModality(
@@ -146,7 +148,7 @@ class _CaptureCockpitScreenState extends State<CaptureCockpitScreen> {
   late final String _boundIncidentIdAtOpen;
   bool _exiting = false;
   Future<void> Function()? _releaseMedia;
-  Future<void> Function({bool finalizeActiveVoice})? _commitPending;
+  Future<bool> Function({bool finalizeActiveVoice})? _commitPending;
 
   WorkspaceEvidenceController get _controller =>
       widget.controller ?? WorkspaceSession.instance.controller;
@@ -169,9 +171,7 @@ class _CaptureCockpitScreenState extends State<CaptureCockpitScreen> {
         (widget.boundIncidentId ?? _controller.currentIncident.id).trim();
     _modality = CaptureCockpitScreen.resolveInitialModality(widget.initialMode);
     if (!_isFlutterTest) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_ensureInternalSession());
-      });
+      unawaited(_ensureInternalSession());
     }
   }
 
@@ -204,12 +204,14 @@ class _CaptureCockpitScreenState extends State<CaptureCockpitScreen> {
   }
 
   Future<void> _switchModalityAfterCommit(WorkspaceCaptureMode mode) async {
+    var committed = true;
     try {
-      await _commitPending?.call(finalizeActiveVoice: false);
+      committed = await _commitPending?.call(finalizeActiveVoice: false) ?? true;
     } catch (error) {
       debugPrint('[Capture] modality-switch commit failed: $error');
+      committed = false;
     }
-    if (!mounted || _exiting) {
+    if (!committed || !mounted || _exiting) {
       return;
     }
     // ValueKey on the child session forces dispose → camera/mic release, then
@@ -220,18 +222,31 @@ class _CaptureCockpitScreenState extends State<CaptureCockpitScreen> {
   /// Leaves Cockpit after committing any completed pending capture.
   ///
   /// Preview is not durable evidence — DONE/Close must flush a completed
-  /// preview through CaptureEngine before navigation. Active recordings are
-  /// not fabricated into evidence. Awaits media release before pop so
-  /// Workspace → Cockpit again does not reuse a stale camera/mic session.
+  /// preview through CaptureEngine before navigation. DONE while a video is
+  /// recording finalizes onto Preview and stays; Close does not. Awaits
+  /// media release before pop so Workspace → Cockpit again does not reuse
+  /// a stale camera/mic session.
+  ///
+  /// If local commit fails, stay on the preview so the user can retry or discard.
   Future<void> _exitCockpit({bool finalizeActiveVoice = false}) async {
     if (_exiting) {
       return;
     }
     setState(() => _exiting = true);
+    var committed = true;
     try {
-      await _commitPending?.call(finalizeActiveVoice: finalizeActiveVoice);
+      committed =
+          await _commitPending?.call(finalizeActiveVoice: finalizeActiveVoice) ??
+              true;
     } catch (error) {
       debugPrint('[Capture] cockpit pending commit failed: $error');
+      committed = false;
+    }
+    if (!committed) {
+      if (mounted) {
+        setState(() => _exiting = false);
+      }
+      return;
     }
     if (!_isFlutterTest) {
       try {

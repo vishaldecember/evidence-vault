@@ -271,6 +271,10 @@ class EvidenceStorageService {
 
       try {
         final snapshot = await task;
+        // Tokenized HTTPS URL. Possession of the URL is enough to GET the
+        // object until Firebase revokes the token — not the same as Storage
+        // rules. Do not log this value. Short-lived custom URLs are not
+        // available from the client SDK without Cloud Functions.
         final downloadUrl = await snapshot.ref.getDownloadURL();
         StorageUploadLog.completed(storagePath);
 

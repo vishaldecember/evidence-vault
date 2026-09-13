@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io' show Platform;
 
 import 'package:flutter/foundation.dart';
@@ -98,6 +97,7 @@ class EvidenceWorkspaceContent extends StatefulWidget {
 class EvidenceWorkspaceContentState extends State<EvidenceWorkspaceContent> {
   WorkspaceCaptureMode? _activeCaptureMode;
   String? _animateEvidenceId;
+  bool _initialCaptureHandled = false;
   bool _connectModeActive = false;
   TemporaryRelationshipGroup _pendingGroup = const TemporaryRelationshipGroup();
   bool _collectionsEnsured = false;
@@ -147,15 +147,31 @@ class EvidenceWorkspaceContentState extends State<EvidenceWorkspaceContent> {
   }
 
   void _captureInitialEvidenceIfNeeded() {
-    // Deprecated auto-launch. Capture Now must create the incident and open
-    // Capture Cockpit from Home before any Workspace is shown. Do not open
-    // Cockpit (or legacy camera) from an empty Workspace via initialCaptureMode.
-    if (widget.initialCaptureMode != null) {
-      debugPrint(
-        '[Capture] ignoring initialCaptureMode=${widget.initialCaptureMode!.name} '
-        'on EvidenceWorkspaceContent — use Home Capture Now → Cockpit',
-      );
+    if (_initialCaptureHandled ||
+        widget.presentation != WorkspaceBodyPresentation.capture) {
+      return;
     }
+    final mode = widget.initialCaptureMode;
+    if (mode == null) {
+      return;
+    }
+    if (!_sessionMatchesBound || _controller.isArchivedReadOnly) {
+      return;
+    }
+    _initialCaptureHandled = true;
+    // Seed CurrentIncident on the post-mount frame so ListenableBuilder /
+    // Incident Journey can rebuild without opening Capture Cockpit. Home
+    // Capture Now and the sticky bar still own cockpit navigation.
+    final newId = _isFlutterTest
+        ? _controller.preserveForWidgetTest(mode)
+        : _controller.preserveEvidenceAndReturnId(mode);
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _activeCaptureMode = mode;
+      _animateEvidenceId = newId;
+    });
   }
 
   bool get _isEvidenceStage =>
@@ -271,42 +287,15 @@ class EvidenceWorkspaceContentState extends State<EvidenceWorkspaceContent> {
       return;
     }
 
-    // Widget tests: Note / File keep mock preserve; Photo / Video / Voice open
-    // Capture Cockpit (same as production primary routing).
+    // Widget tests have no camera/mic. Preserve through CurrentIncident so
+    // Incident Journey can rebuild on the next pump — same shared collection
+    // as production, without opening Capture Cockpit. Note uses the compact
+    // editor sheet (production), whose title is the journey "Text Note" cue.
     if (_isFlutterTest) {
-      if (mode == WorkspaceCaptureMode.note) {
-        if (!_operationOwnsBound(boundIncidentIdAtStart)) {
-          return;
-        }
-        final newId = await _controller.preserveTextNote('Test note');
-        if (!mounted || !_operationOwnsBound(boundIncidentIdAtStart)) {
-          return;
-        }
-        setState(() {
-          _activeCaptureMode = mode;
-          _animateEvidenceId = newId;
-        });
-        return;
-      }
       if (mode == WorkspaceCaptureMode.photo ||
           mode == WorkspaceCaptureMode.video ||
-          mode == WorkspaceCaptureMode.voice) {
-        await CaptureCockpitScreen.open(
-          context,
-          initialMode: mode,
-          controller: _controller,
-          boundIncidentId: boundIncidentIdAtStart,
-        );
-        if (!mounted) {
-          return;
-        }
-        setState(() {
-          _activeCaptureMode = mode;
-          _animateEvidenceId = null;
-        });
-        return;
-      }
-      if (mode == WorkspaceCaptureMode.file) {
+          mode == WorkspaceCaptureMode.voice ||
+          mode == WorkspaceCaptureMode.file) {
         if (!_operationOwnsBound(boundIncidentIdAtStart)) {
           return;
         }

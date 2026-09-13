@@ -18,7 +18,6 @@ import '../models/workspace_evidence_item.dart';
 import '../services/vault/incident_collection_store.dart';
 import '../screens/capture/continuous_capture_screen.dart';
 import '../screens/collection_browser_screen.dart';
-import '../screens/create_evidence_screen.dart';
 import '../screens/evidence_record_screen.dart';
 import '../screens/incident_workspace_shell.dart';
 import '../screens/evidence_image_inspection_screen.dart';
@@ -84,11 +83,6 @@ abstract final class AppNavigation {
     );
   }
 
-  /// Legacy capture flow — retained for Sprint 4 wiring, not linked from Home.
-  static Future<void> openCreateEvidence(BuildContext context) {
-    return push(context, const CreateEvidenceScreen());
-  }
-
   /// Opens the Collection Browser for one persisted IncidentCollection.
   static Future<void> openCollectionBrowser(
     BuildContext context, {
@@ -114,9 +108,10 @@ abstract final class AppNavigation {
 
   /// Library / Vault / Collection card tap after [WorkspaceSession.openIncident].
   ///
-  /// Evaluates Phase 3D Organize Readiness on the hydrated working set, then
-  /// opens the existing Incident Workspace at Capture or Organize. Not a
-  /// second opening path — still [openIncidentWorkspace].
+  /// Evaluates Phase 3D Organize Readiness on the already-bound working set
+  /// (no hydrate wait), then opens the existing Incident Workspace at Capture
+  /// or Organize. Empty shells fall back to Capture. Not a second opening
+  /// path — still [openIncidentWorkspace].
   static Future<void> openIncidentWorkspaceFromLibrary(
     BuildContext context,
   ) async {
@@ -326,8 +321,6 @@ abstract final class AppNavigation {
         onAddContext,
     void Function(String evidenceId, String text)? onAddContextText,
   }) {
-    WorkspaceSession.instance.enterEvidenceEditing();
-
     return push(
       context,
       EvidenceRecordScreen(

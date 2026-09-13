@@ -24,8 +24,16 @@ abstract final class MetadataService {
     );
   }
 
+  /// Test seam — delayed or unavailable GPS without touching Geolocator.
+  @visibleForTesting
+  static Future<CaptureProvenanceSnapshot> Function()? debugCollectAtCapture;
+
   /// Device + location for the capture event. Never invents coordinates or model.
   static Future<CaptureProvenanceSnapshot> collectAtCapture() async {
+    final override = debugCollectAtCapture;
+    if (override != null) {
+      return override();
+    }
     if (_inFlutterTest) {
       return const CaptureProvenanceSnapshot(
         device: EvidenceDevice(name: '', platform: 'test'),

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Disallow cleartext and user-installed CAs. System CAs only.
+     Live MITM resistance still REQUIRES DEVICE/CONSOLE VERIFICATION. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

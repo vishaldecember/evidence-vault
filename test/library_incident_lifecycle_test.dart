@@ -44,14 +44,17 @@ void main() {
     WidgetTester tester,
     List<LibraryIncidentSummary> incidents, {
     List<String>? opened,
+    Size surfaceSize = const Size(390, 844),
+    double horizontalInset = 0,
   }) async {
     final recorded = opened ?? <String>[];
-    await tester.binding.setSurfaceSize(const Size(390, 844));
+    await tester.binding.setSurfaceSize(surfaceSize);
     addTearDown(() => tester.binding.setSurfaceSize(null));
     await tester.pumpWidget(
       MaterialApp(
         home: Scaffold(
           body: SingleChildScrollView(
+            padding: EdgeInsets.symmetric(horizontal: horizontalInset),
             child: LibraryOfTruthSection(
               incidents: incidents,
               onIncidentTap: recorded.add,
@@ -63,7 +66,7 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('defaults to Active with compact tabs on the title row', (
+  testWidgets('defaults to Active with thumb-sized tabs on the title row', (
     tester,
   ) async {
     await pumpLibrary(tester, [
@@ -71,6 +74,13 @@ void main() {
     ]);
 
     expect(find.text('The Library of Truth'), findsOneWidget);
+    expect(
+      tester
+          .widget<Text>(find.byKey(const Key('library_of_truth_title')))
+          .style
+          ?.fontSize,
+      greaterThanOrEqualTo(18),
+    );
     expect(find.text('Active'), findsOneWidget);
     expect(find.text('Archived'), findsOneWidget);
     expect(find.text('Deleted'), findsOneWidget);
@@ -93,11 +103,12 @@ void main() {
     );
     expect((activeTab.center.dy - archivedTab.center.dy).abs(), lessThan(1));
     expect((activeTab.center.dy - deletedTab.center.dy).abs(), lessThan(1));
-    expect((title.center.dy - activeTab.center.dy).abs(), lessThan(18));
+    expect((title.center.dy - activeTab.center.dy).abs(), lessThan(24));
     expect(activeTab.left, greaterThan(title.right - 0.5));
-    expect(title.width, greaterThan(155));
-    expect(activeTab.height, greaterThan(10));
-    expect(archivedTab.height, greaterThan(10));
+    expect(title.width, greaterThan(70));
+    expect(activeTab.height, greaterThanOrEqualTo(48));
+    expect(archivedTab.height, greaterThanOrEqualTo(48));
+    expect(deletedTab.height, greaterThanOrEqualTo(48));
     expect(tester.takeException(), isNull);
 
     Color tabFill(Key key) {
@@ -125,6 +136,41 @@ void main() {
       tester.widget<Text>(find.text('Deleted')).style?.color,
       AppColors.textMuted,
     );
+  });
+
+  testWidgets('Library tabs stay on one row at Motorola g35 width', (
+    tester,
+  ) async {
+    await pumpLibrary(
+      tester,
+      [_incident(id: 'incident-a', title: 'Street Fight')],
+      surfaceSize: const Size(360, 800),
+      horizontalInset: 24,
+    );
+
+    final title = tester.getRect(find.text('The Library of Truth'));
+    final activeTab = tester.getRect(
+      find.byKey(const Key('library_tab_active')),
+    );
+    final archivedTab = tester.getRect(
+      find.byKey(const Key('library_tab_archived')),
+    );
+    final deletedTab = tester.getRect(
+      find.byKey(const Key('library_tab_recently_deleted')),
+    );
+
+    expect((activeTab.center.dy - archivedTab.center.dy).abs(), lessThan(1));
+    expect((activeTab.center.dy - deletedTab.center.dy).abs(), lessThan(1));
+    expect((title.center.dy - activeTab.center.dy).abs(), lessThan(24));
+    expect(activeTab.left, greaterThan(title.right - 0.5));
+    expect(activeTab.height, greaterThanOrEqualTo(48));
+    expect(archivedTab.height, greaterThanOrEqualTo(48));
+    expect(deletedTab.height, greaterThanOrEqualTo(48));
+    expect(activeTab.width, greaterThanOrEqualTo(48));
+    expect(archivedTab.width, greaterThanOrEqualTo(48));
+    expect(deletedTab.width, greaterThanOrEqualTo(48));
+    expect(deletedTab.right, lessThanOrEqualTo(360));
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('active card opens; archived card remains viewable', (

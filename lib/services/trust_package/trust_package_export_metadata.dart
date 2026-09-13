@@ -8,7 +8,7 @@ abstract final class TrustPackageExportMetadata {
       'This Trust Package was generated directly from the Incident Aggregate.\n'
       'The package contains evidence references, chronological reconstruction, '
       'relationship analysis and investigator-authored narrative.\n'
-      'Evidence Vault does not alter investigator observations.';
+      'My Truth does not alter investigator observations.';
 
   static Map<String, String> embedded(TrustPackage package) {
     final metadata = package.metadata;

@@ -30,10 +30,6 @@ class InvestigationCanvasController extends ChangeNotifier {
     notifyListeners();
   }
 
-  @Deprecated('Use setActiveTab')
-  void setActiveSegment(InvestigationWorkspaceTab segment) =>
-      setActiveTab(segment);
-
   void selectTimelineAnchor({
     required String anchorId,
     required List<RelationshipGroup> groups,
@@ -149,6 +145,3 @@ class InvestigationCanvasController extends ChangeNotifier {
     notifyListeners();
   }
 }
-
-@Deprecated('Use InvestigationCanvasController')
-typedef ReconstructionCanvasController = InvestigationCanvasController;

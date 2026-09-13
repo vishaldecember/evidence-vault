@@ -107,7 +107,7 @@ class _AuthHeaderState extends State<AuthHeader>
             if (widget.showBrandName) ...[
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Evidence Vault',
+                'My Truth',
                 style: AppTextStyles.appTitle.copyWith(fontSize: 22),
               ),
             ],

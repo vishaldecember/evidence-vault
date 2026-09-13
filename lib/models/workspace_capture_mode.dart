@@ -31,12 +31,4 @@ enum WorkspaceCaptureMode {
         WorkspaceCaptureMode.note => Icons.edit_note_outlined,
         WorkspaceCaptureMode.file => Icons.attach_file_outlined,
       };
-
-  String get sprintPlaceholderMessage => switch (this) {
-        WorkspaceCaptureMode.photo => 'Camera capture coming in Sprint 4',
-        WorkspaceCaptureMode.video => 'Video capture coming in Sprint 4',
-        WorkspaceCaptureMode.voice => 'Voice capture coming in Sprint 4',
-        WorkspaceCaptureMode.note => 'Note capture coming in Sprint 4',
-        WorkspaceCaptureMode.file => 'File capture coming in Sprint 4',
-      };
 }

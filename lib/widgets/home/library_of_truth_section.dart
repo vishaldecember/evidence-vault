@@ -202,41 +202,34 @@ class _LibraryHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        const tabReserve = 132.0;
-        final titleMax = (constraints.maxWidth - tabReserve - 6).clamp(
-          120.0,
-          constraints.maxWidth,
-        );
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: titleMax,
-              child: Text(
-                'The Library of Truth',
-                key: titleKey,
-                maxLines: 1,
-                softWrap: false,
-                overflow: TextOverflow.visible,
-                style: AppTextStyles.heading.copyWith(
-                  fontSize: 18,
-                  letterSpacing: -0.3,
-                ),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Flexible(
+          flex: 5,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'The Library of Truth',
+              key: titleKey,
+              maxLines: 1,
+              softWrap: false,
+              style: AppTextStyles.heading.copyWith(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: -0.45,
               ),
             ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                alignment: Alignment.centerRight,
-                child: _LifecycleTabs(tab: tab, onTabSelected: onTabSelected),
-              ),
-            ),
-          ],
-        );
-      },
+          ),
+        ),
+        const SizedBox(width: 6),
+        Expanded(
+          flex: 6,
+          child: _LifecycleTabs(tab: tab, onTabSelected: onTabSelected),
+        ),
+      ],
     );
   }
 }
@@ -247,48 +240,37 @@ class _LifecycleTabs extends StatelessWidget {
   final _LibraryLifecycleTab tab;
   final ValueChanged<_LibraryLifecycleTab> onTabSelected;
 
-  static const double _radius = 12;
-  static const Color _divider = Color(0xFF8B95A8);
-
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(_radius),
-        border: Border.all(color: _divider.withValues(alpha: 0.45), width: 1),
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(_radius - 0.5),
-        child: IntrinsicHeight(
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _LifecycleTabButton(
-                key: const Key('library_tab_active'),
-                label: 'Active',
-                selected: tab == _LibraryLifecycleTab.active,
-                onTap: () => onTabSelected(_LibraryLifecycleTab.active),
-              ),
-              const VerticalDivider(width: 1, thickness: 1, color: _divider),
-              _LifecycleTabButton(
-                key: const Key('library_tab_archived'),
-                label: 'Archived',
-                selected: tab == _LibraryLifecycleTab.archived,
-                onTap: () => onTabSelected(_LibraryLifecycleTab.archived),
-              ),
-              const VerticalDivider(width: 1, thickness: 1, color: _divider),
-              _LifecycleTabButton(
-                key: const Key('library_tab_recently_deleted'),
-                label: 'Deleted',
-                selected: tab == _LibraryLifecycleTab.recentlyDeleted,
-                onTap: () =>
-                    onTabSelected(_LibraryLifecycleTab.recentlyDeleted),
-              ),
-            ],
+    return Row(
+      children: [
+        Expanded(
+          child: _LifecycleTabButton(
+            key: const Key('library_tab_active'),
+            label: 'Active',
+            selected: tab == _LibraryLifecycleTab.active,
+            onTap: () => onTabSelected(_LibraryLifecycleTab.active),
           ),
         ),
-      ),
+        const SizedBox(width: 2),
+        Expanded(
+          child: _LifecycleTabButton(
+            key: const Key('library_tab_archived'),
+            label: 'Archived',
+            selected: tab == _LibraryLifecycleTab.archived,
+            onTap: () => onTabSelected(_LibraryLifecycleTab.archived),
+          ),
+        ),
+        const SizedBox(width: 2),
+        Expanded(
+          child: _LifecycleTabButton(
+            key: const Key('library_tab_recently_deleted'),
+            label: 'Deleted',
+            selected: tab == _LibraryLifecycleTab.recentlyDeleted,
+            onTap: () => onTabSelected(_LibraryLifecycleTab.recentlyDeleted),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -305,8 +287,11 @@ class _LifecycleTabButton extends StatelessWidget {
   final bool selected;
   final VoidCallback onTap;
 
+  static const double _radius = 8;
+
   @override
   Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(_radius);
     return Semantics(
       button: true,
       selected: selected,
@@ -315,18 +300,40 @@ class _LifecycleTabButton extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
+          borderRadius: borderRadius,
+          splashColor: AppColors.primary.withValues(alpha: 0.08),
+          highlightColor: AppColors.primary.withValues(alpha: 0.04),
           child: AnimatedContainer(
             duration: AppMotion.fast,
             curve: AppMotion.enter,
-            constraints: const BoxConstraints(minHeight: 26, minWidth: 28),
+            constraints: const BoxConstraints(minHeight: 48),
             alignment: Alignment.center,
-            padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 12),
             decoration: BoxDecoration(
               color: selected ? AppColors.primary : Colors.white,
+              borderRadius: borderRadius,
+              border: Border.all(
+                color: selected
+                    ? AppColors.primaryDeep
+                    : AppColors.borderAccent.withValues(alpha: 0.92),
+                width: selected ? 1.5 : 1,
+              ),
+              boxShadow: selected
+                  ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.22),
+                        blurRadius: 5,
+                        offset: const Offset(0, 1),
+                      ),
+                    ]
+                  : null,
             ),
             child: Text(
               label,
+              textAlign: TextAlign.center,
               maxLines: 1,
+              softWrap: false,
+              overflow: TextOverflow.fade,
               style: AppTextStyles.caption.copyWith(
                 color: selected ? AppColors.onPrimary : AppColors.textMuted,
                 fontWeight: selected ? FontWeight.w700 : FontWeight.w600,

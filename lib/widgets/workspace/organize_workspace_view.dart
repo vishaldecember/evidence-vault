@@ -193,6 +193,7 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
   final List<String> _groupDraftIds = [];
   bool _groupDropArmed = false;
   final Set<String> _wobblingCloneIds = {};
+  Set<String> _appendedWobblingIds = const {};
   late final TextEditingController _groupNameController;
   String _groupBaselineName = '';
   List<String> _groupBaselineIds = const [];
@@ -252,6 +253,13 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
   }
 
   List<WorkspaceEvidenceItem> get _floatingContexts => _unsnappedContexts;
+
+  static bool _sameIds(Set<String> left, Set<String> right) {
+    if (left.length != right.length) {
+      return false;
+    }
+    return left.containsAll(right);
+  }
 
   List<WorkspaceEvidenceItem> _contextsForCaptured(String capturedId) {
     final ids = {
@@ -463,9 +471,16 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
   }
 
   void _dismissGroupWorkspace() {
-    if (_groupsModalOpen) {
+    final closeModal = _groupsModalOpen;
+    final collapseCard = _groupsExpanded;
+    if (closeModal || collapseCard) {
       setState(() {
-        _groupsModalOpen = false;
+        if (closeModal) {
+          _groupsModalOpen = false;
+        }
+        if (collapseCard) {
+          _groupsExpanded = false;
+        }
       });
     }
     if (_groupComposing) {
@@ -569,7 +584,7 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
               GestureDetector(
                 key: OrganizeWorkspaceView.workspaceDismissKey,
                 behavior: HitTestBehavior.translucent,
-                onTap: _groupComposing || _groupsModalOpen
+                onTap: _groupComposing || _groupsModalOpen || _groupsExpanded
                     ? _dismissGroupWorkspace
                     : null,
                 child: CustomScrollView(
@@ -646,6 +661,14 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
                             onWorkspaceDismiss: _groupComposing
                                 ? _dismissGroupWorkspace
                                 : null,
+                            onWobblingContextIdsChanged: (ids) {
+                              if (_sameIds(_appendedWobblingIds, ids)) {
+                                return;
+                              }
+                              setState(() {
+                                _appendedWobblingIds = ids;
+                              });
+                            },
                           ),
                         ]),
                       ),
@@ -692,8 +715,9 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
                     });
                   },
                   onAddOrganizeContext: widget.onAddOrganizeContext,
-                  unsnappedContextIds: {
+                  wobblingContextIds: {
                     for (final item in _unsnappedContexts) item.id,
+                    ..._appendedWobblingIds,
                   },
                 ),
               ),
@@ -1014,7 +1038,7 @@ class _OrganizeGroupsBottomStack extends StatelessWidget {
     required this.onToggleExpanded,
     required this.onOpenCategory,
     required this.onAddOrganizeContext,
-    required this.unsnappedContextIds,
+    required this.wobblingContextIds,
   });
 
   final bool expanded;
@@ -1023,16 +1047,19 @@ class _OrganizeGroupsBottomStack extends StatelessWidget {
   final VoidCallback onToggleExpanded;
   final ValueChanged<OrganizeGroupCategory> onOpenCategory;
   final ValueChanged<WorkspaceCaptureMode>? onAddOrganizeContext;
-  final Set<String> unsnappedContextIds;
+  final Set<String> wobblingContextIds;
 
   @override
   Widget build(BuildContext context) {
+    final addContext = onAddOrganizeContext;
     final showToolbar =
-        onAddOrganizeContext != null && !groupsModalOpen && !composingGroup;
-    final toolbar = _OrganizeAddContextBar(
-      onSelected: onAddOrganizeContext!,
-      unsnappedContextIds: unsnappedContextIds,
-    );
+        addContext != null && !groupsModalOpen && !composingGroup;
+    final toolbar = showToolbar
+        ? _OrganizeAddContextBar(
+            onSelected: addContext,
+            wobblingContextIds: wobblingContextIds,
+          )
+        : null;
     return Column(
       key: OrganizeWorkspaceView.groupsLayerKey,
       mainAxisSize: MainAxisSize.min,
@@ -1053,14 +1080,14 @@ class _OrganizeGroupsBottomStack extends StatelessWidget {
                   padding: const EdgeInsets.only(
                     top: OrganizeWorkspaceView.groupsToolbarGap,
                   ),
-                  child: toolbar,
+                  child: toolbar!,
                 )
               : Transform.translate(
                   offset: const Offset(
                     0,
                     -OrganizeWorkspaceView.groupsToolbarOverlap,
                   ),
-                  child: toolbar,
+                  child: toolbar!,
                 ),
       ],
     );
@@ -1158,6 +1185,7 @@ class _EvidenceStructureCard extends StatelessWidget {
     this.onGroupCloneDragEnded,
     this.onRemoveGroupClone,
     this.onWorkspaceDismiss,
+    this.onWobblingContextIdsChanged,
   });
 
   final GlobalKey<OrganizeChronologyCanvasState>? canvasKey;
@@ -1180,6 +1208,7 @@ class _EvidenceStructureCard extends StatelessWidget {
   final VoidCallback? onGroupCloneDragEnded;
   final ValueChanged<String>? onRemoveGroupClone;
   final VoidCallback? onWorkspaceDismiss;
+  final ValueChanged<Set<String>>? onWobblingContextIdsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1208,6 +1237,7 @@ class _EvidenceStructureCard extends StatelessWidget {
           onGroupCloneDragEnded: onGroupCloneDragEnded,
           onRemoveGroupClone: onRemoveGroupClone,
           onWorkspaceDismiss: onWorkspaceDismiss,
+          onWobblingContextIdsChanged: onWobblingContextIdsChanged,
         ),
       ],
     );
@@ -1358,7 +1388,7 @@ class _GroupsCategoryMatrix extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 4),
         Expanded(
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1398,7 +1428,7 @@ class _GroupCategoryTile extends StatelessWidget {
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppSpacing.sm),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1467,7 +1497,7 @@ String? organizeRelatedPersonLabel(WorkspaceEvidenceItem item) {
   if (role == null || role.isEmpty) {
     return name;
   }
-  return '$name Â· $role';
+  return '$name \u00B7 $role';
 }
 
 String? _relatedPersonRoleLabel(String? roleName) {
@@ -1507,11 +1537,11 @@ String? organizeLinkedLabel(
 class _OrganizeAddContextBar extends StatelessWidget {
   const _OrganizeAddContextBar({
     required this.onSelected,
-    this.unsnappedContextIds = const {},
+    this.wobblingContextIds = const {},
   });
 
   final ValueChanged<WorkspaceCaptureMode> onSelected;
-  final Set<String> unsnappedContextIds;
+  final Set<String> wobblingContextIds;
 
   static const Key barKey = OrganizeWorkspaceView.addContextBarKey;
   static const _modes = <WorkspaceCaptureMode>[
@@ -1522,8 +1552,8 @@ class _OrganizeAddContextBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final awaiting = unsnappedContextIds.isNotEmpty;
-    final restartToken = (unsnappedContextIds.toList()..sort()).join(',');
+    final awaiting = wobblingContextIds.isNotEmpty;
+    final restartToken = (wobblingContextIds.toList()..sort()).join(',');
     return Semantics(
       container: true,
       label: OrganizeWorkspaceView.addContextTitle,

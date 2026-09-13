@@ -157,7 +157,8 @@ class EvidenceSyncQueue extends ChangeNotifier {
   EvidenceSyncQueue({SharedPreferences? preferences})
       : _preferencesOverride = preferences;
 
-  static const String _storageKey = 'evidence_sync_queue_v1';
+  static const String storageKey = 'evidence_sync_queue_v1';
+  static const String _storageKey = storageKey;
 
   SharedPreferences? _preferencesOverride;
   final List<EvidenceSyncQueueItem> _items = [];
@@ -254,12 +255,29 @@ class EvidenceSyncQueue extends ChangeNotifier {
 
   Future<void> enqueue(EvidenceSyncQueueItem item) async {
     await restore();
-    // Idempotent: one queue row per evidenceId (duplicate upload protection).
-    _items.removeWhere((entry) => entry.evidenceId == item.evidenceId);
+    // Canonical identity is incidentId + evidenceId. evidenceId is unique in
+    // the vault, so replacing any existing evidenceId row also prevents a
+    // second independent retry record for the same pair.
+    _items.removeWhere(
+      (entry) =>
+          entry.evidenceId == item.evidenceId ||
+          (entry.incidentId == item.incidentId &&
+              entry.evidenceId == item.evidenceId),
+    );
     _items.add(item);
     _sortStable();
     notifyListeners();
     await _persist();
+  }
+
+  /// Count of canonical retry rows for one incidentId + evidenceId pair.
+  int countFor({required String incidentId, required String evidenceId}) {
+    return _items
+        .where(
+          (entry) =>
+              entry.incidentId == incidentId && entry.evidenceId == evidenceId,
+        )
+        .length;
   }
 
   bool _isReady(EvidenceSyncQueueItem item, DateTime now) {

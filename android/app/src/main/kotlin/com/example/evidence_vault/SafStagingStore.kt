@@ -2,7 +2,6 @@ package com.example.evidence_vault
 
 import android.content.Context
 import android.net.Uri
-import android.util.Log
 import org.json.JSONObject
 import java.io.File
 import java.io.FileOutputStream
@@ -72,7 +71,7 @@ internal object SafStagingStore {
         return try {
             JSONObject(file.readText())
         } catch (error: Exception) {
-            Log.w(TAG, "meta parse failed operationId=$id", error)
+            EvLog.w(TAG, "meta parse failed operationId=$id", error)
             null
         }
     }
@@ -119,14 +118,14 @@ internal object SafStagingStore {
         if (bin.exists()) bin.delete()
 
         writeCopyingMeta(context, id, uri.toString(), fileName, mimeType, persistable)
-        Log.i(TAG, "COPY_START operationId=$id uri=$uri")
+        EvLog.i(TAG, "COPY_START operationId=$id uri=$uri")
 
         val digest = MessageDigest.getInstance("SHA-256")
         var size = 0L
         try {
             context.contentResolver.openInputStream(uri).use { input ->
                 if (input == null) {
-                    Log.e(TAG, "COPY_FAILED operationId=$id reason=null_stream")
+                    EvLog.e(TAG, "COPY_FAILED operationId=$id reason=null_stream")
                     writeFailedMeta(context, id, uri.toString(), fileName, mimeType, persistable)
                     return false
                 }
@@ -134,7 +133,7 @@ internal object SafStagingStore {
                     val buffer = ByteArray(8192)
                     while (true) {
                         if (isCancelled(id)) {
-                            Log.i(TAG, "COPY_CANCELLED operationId=$id")
+                            EvLog.i(TAG, "COPY_CANCELLED operationId=$id")
                             output.fd.sync()
                             deleteOperation(context, id)
                             return false
@@ -151,7 +150,7 @@ internal object SafStagingStore {
                 }
             }
         } catch (error: Exception) {
-            Log.e(TAG, "COPY_FAILED operationId=$id", error)
+            EvLog.e(TAG, "COPY_FAILED operationId=$id", error)
             part.delete()
             writeFailedMeta(context, id, uri.toString(), fileName, mimeType, persistable)
             return false
@@ -167,7 +166,7 @@ internal object SafStagingStore {
                 part.copyTo(bin, overwrite = true)
                 part.delete()
             } catch (error: Exception) {
-                Log.e(TAG, "COPY_RENAME_FAILED operationId=$id", error)
+                EvLog.e(TAG, "COPY_RENAME_FAILED operationId=$id", error)
                 writeFailedMeta(context, id, uri.toString(), fileName, mimeType, persistable)
                 return false
             }
@@ -188,11 +187,11 @@ internal object SafStagingStore {
         writeAtomic(completeFile(dir, id), "complete")
 
         if (isCancelled(id) || !isComplete(context, id)) {
-            Log.w(TAG, "COPY_INCOMPLETE_AFTER_PROMOTE operationId=$id")
+            EvLog.w(TAG, "COPY_INCOMPLETE_AFTER_PROMOTE operationId=$id")
             if (isCancelled(id)) deleteOperation(context, id)
             return false
         }
-        Log.i(TAG, "COPY_COMPLETE operationId=$id size=$size sha256=$sha fileName=$fileName")
+        EvLog.i(TAG, "COPY_COMPLETE operationId=$id size=$size sha256=$sha fileName=$fileName")
         return true
     }
 
@@ -212,7 +211,7 @@ internal object SafStagingStore {
         if (uri.scheme != "content") return false
         val fileName = sanitizeDisplayName(meta.optString("fileName"))
         val mime = meta.optString("mimeType").takeIf { it.isNotBlank() && it != "null" }
-        Log.i(TAG, "COPY_RETRY operationId=$id uri=$uri")
+        EvLog.i(TAG, "COPY_RETRY operationId=$id uri=$uri")
         return streamCopy(context, id, uri, fileName, mime, persistable = true)
     }
 
@@ -224,9 +223,9 @@ internal object SafStagingStore {
         val pendingJson = readPendingPointer(context)
         if (pendingJson?.optString("operationId") == id && pending.exists()) {
             pending.delete()
-            Log.i(TAG, "PENDING_POINTER_CLEARED operationId=$id")
+            EvLog.i(TAG, "PENDING_POINTER_CLEARED operationId=$id")
         }
-        Log.i(TAG, "DISCARD operationId=$id")
+        EvLog.i(TAG, "DISCARD operationId=$id")
     }
 
     fun discardAll(context: Context) {
@@ -243,7 +242,7 @@ internal object SafStagingStore {
             }
             file.delete()
         }
-        Log.i(TAG, "DISCARD_ALL")
+        EvLog.i(TAG, "DISCARD_ALL")
     }
 
     fun sweepStale(context: Context) {
@@ -255,7 +254,7 @@ internal object SafStagingStore {
             val meta = readMeta(context, op)
             val created = meta?.optLong("createdAtMs", file.lastModified()) ?: file.lastModified()
             if (now - created > MAX_AGE_MS) {
-                Log.i(TAG, "STALE_SWEEP operationId=$op ageMs=${now - created}")
+                EvLog.i(TAG, "STALE_SWEEP operationId=$op ageMs=${now - created}")
                 deleteOperation(context, op)
             }
         }
@@ -267,7 +266,7 @@ internal object SafStagingStore {
         return try {
             JSONObject(file.readText())
         } catch (error: Exception) {
-            Log.w(TAG, "pending pointer parse failed", error)
+            EvLog.w(TAG, "pending pointer parse failed", error)
             null
         }
     }

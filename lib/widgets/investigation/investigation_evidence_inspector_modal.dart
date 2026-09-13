@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../controllers/workspace_evidence_controller.dart';
+import '../../controllers/workspace_session.dart';
 import '../../domain/organize/organize_proactive_record.dart';
 import '../../models/evidence_record_model.dart';
 import '../../models/linked_evidence_item.dart';
@@ -39,6 +40,10 @@ const _fullRecordActionLabel = 'View complete record →';
 const _modalOuterMargin = AppSpacing.md;
 
 /// Shows an elevated, blurred inspector over the Incident Workspace.
+///
+/// The inspector is a temporary layer on the surface that opened it. The
+/// originating methodology stage / investigation tab are snapshotted here and
+/// restored when the inspector dismisses, so Back never invents a new parent.
 Future<void> showInvestigationEvidenceInspectorModal({
   required BuildContext context,
   required WorkspaceEvidenceItem evidence,
@@ -46,12 +51,16 @@ Future<void> showInvestigationEvidenceInspectorModal({
   List<WorkspaceEvidenceItem>? orderedEvidence,
   String? boundIncidentId,
   Future<void> Function(WorkspaceEvidenceItem evidence)? onOpenAdvancedRecord,
-}) {
+}) async {
   final resolvedOrder = orderedEvidence ??
       evidenceInspectorOrder(controller.journeyEvidenceItems);
   final order = resolvedOrder.isEmpty ? [evidence] : resolvedOrder;
+  final session = WorkspaceSession.instance;
+  final originStage = session.activeMethodologyStage;
+  final originTab = session.activeInvestigationTab;
 
-  return showGeneralDialog<void>(
+  try {
+    await showGeneralDialog<void>(
     context: context,
     barrierDismissible: false,
     barrierLabel: 'Evidence inspector',
@@ -102,7 +111,10 @@ Future<void> showInvestigationEvidenceInspectorModal({
         ],
       );
     },
-  );
+    );
+  } finally {
+    session.setActiveStage(originStage, investigationTab: originTab);
+  }
 }
 
 class InvestigationEvidenceInspectorModal extends StatefulWidget {

@@ -1,6 +1,3 @@
-import 'dart:async';
-import 'dart:io' show Platform;
-
 import 'package:flutter/foundation.dart';
 
 import '../controllers/workspace_evidence_controller.dart';
@@ -52,45 +49,23 @@ abstract final class IncidentWorkspaceEntry {
     return stageFor(readiness);
   }
 
-  /// Uses the local working set already established by [WorkspaceSession.openIncident].
+  /// Routes from the working set already bound by [WorkspaceSession.openIncident].
   ///
-  /// When evidence is already in memory, routes immediately. When the session
-  /// is still an empty shell, waits for the existing local hydrate — never a
-  /// new Firestore query. Times out to [fallbackStage] rather than guessing
-  /// ready or blocking Incident access.
+  /// Does not wait for cache hydrate or cloud enrich. Evidence already in
+  /// memory is assessed; an empty shell uses [fallbackStage] rather than
+  /// guessing Organize-ready. Hydrate continues in the background and
+  /// existing listeners fill the destination.
   static Future<InvestigationMethodologyStage> resolveAfterHydrate(
     WorkspaceSession session,
   ) async {
     final controller = session.controller;
-    if (controller.currentIncident.evidence.isNotEmpty) {
-      return stageFromWorkingSet(controller);
-    }
-    if (_isFlutterTest) {
-      return stageFromWorkingSet(controller);
-    }
-    try {
-      await session.ensureLocalHydrateSettled().timeout(
-        const Duration(seconds: 3),
-      );
-    } on TimeoutException {
-      debugPrint(
-        '[Entry] local hydrate wait timed out; using current working set',
-      );
-    } catch (error) {
-      debugPrint('[Entry] local hydrate wait failed: $error');
-    }
-    final resolved = stageFromWorkingSet(session.controller);
-    final incident = session.controller.currentIncident;
+    final resolved = stageFromWorkingSet(controller);
+    final incident = controller.currentIncident;
     debugPrint(
-      '[Entry] hydrate settled incident=${incident.id} '
+      '[Entry] route incident=${incident.id} '
       'count=${incident.evidenceCount} '
-      'ids=${[for (final item in incident.evidence) item.id]} '
       'stage=$resolved',
     );
     return resolved;
-  }
-
-  static bool get _isFlutterTest {
-    return !kIsWeb && Platform.environment.containsKey('FLUTTER_TEST');
   }
 }

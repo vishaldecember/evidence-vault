@@ -8,6 +8,7 @@ import 'package:video_player/video_player.dart';
 import '../../constants/app_spacing.dart';
 import '../../theme/app_colors.dart';
 import '../../theme/app_text_styles.dart';
+import '../evidence_inspector/evidence_media_source.dart';
 import 'cockpit_immersive_preview.dart';
 
 /// Instant Capture confirmation overlay.
@@ -235,14 +236,31 @@ class CaptureImagePreview extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Image.file(
-      File(path),
-      fit: BoxFit.contain,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (_, _, _) => const Center(
-        child: Icon(Icons.broken_image_outlined, color: Colors.white54, size: 48),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final logicalWidth = constraints.maxWidth.isFinite &&
+                constraints.maxWidth > 0
+            ? constraints.maxWidth
+            : MediaQuery.sizeOf(context).width;
+        final cacheWidth = EvidenceMediaSource.decodeWidth(
+          logicalWidth: logicalWidth,
+          devicePixelRatio: MediaQuery.devicePixelRatioOf(context),
+        );
+        return Image.file(
+          File(path),
+          fit: BoxFit.contain,
+          width: double.infinity,
+          height: double.infinity,
+          cacheWidth: cacheWidth,
+          errorBuilder: (_, _, _) => const Center(
+            child: Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 48,
+            ),
+          ),
+        );
+      },
     );
   }
 }
