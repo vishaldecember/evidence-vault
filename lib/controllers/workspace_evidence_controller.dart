@@ -15,6 +15,7 @@ import '../domain/participant/participant.dart';
 import '../domain/participant/related_person_link.dart';
 import '../domain/participant/related_person_metadata.dart';
 import '../domain/incident/incident_aggregate.dart';
+import '../domain/incident/incident_composition.dart';
 import '../domain/organize/organize_context_anchor.dart';
 import '../domain/organize/organize_readiness.dart';
 import '../domain/trust_package/trust_package.dart';
@@ -372,18 +373,33 @@ class WorkspaceEvidenceController extends ChangeNotifier
     }
   }
 
-  /// Publishes this incident's evidence count to Library by immutable id.
+  /// Publishes this incident's evidence/context counts to Library by id.
   void _publishLibraryEvidenceCount() {
+    publishLibraryComposition();
+  }
+
+  /// Library composition from the live aggregate. [allowZeroEvidence] is for
+  /// post-hydrate truth; the default keeps last-known counts across an empty
+  /// Library → open shell so the card does not flash Evidence: 0.
+  void publishLibraryComposition({bool allowZeroEvidence = false}) {
     final incident = currentIncident;
     if (incident.id.isEmpty) {
       return;
     }
+    final composition = IncidentComposition.fromStore(_aggregate.store);
+    final isEmptyShell = composition.evidenceCount == 0 &&
+        composition.contextEnrichedCount == 0 &&
+        !allowZeroEvidence;
     IncidentLibraryService.instance.upsertFromLocal(
       incidentId: incident.id,
       title: incident.title,
-      evidenceCount: incident.evidenceCount,
+      evidenceCount: composition.evidenceCount,
+      contextEnrichedCount:
+          isEmptyShell ? null : composition.contextEnrichedCount,
+      journeyStage: isEmptyShell ? null : incident.journeyStage,
       updatedAt: incident.updatedAt,
       isInProgress: !incident.manuallyComplete,
+      allowZeroEvidence: allowZeroEvidence,
     );
   }
 
@@ -448,11 +464,14 @@ class WorkspaceEvidenceController extends ChangeNotifier
     _syncRichBaseline();
   }
 
-  String preserveEvidenceAndReturnId(WorkspaceCaptureMode mode) {
+  String preserveEvidenceAndReturnId(
+    WorkspaceCaptureMode mode, {
+    bool asOrganizeContext = false,
+  }) {
     if (isArchivedReadOnly) {
       return '';
     }
-    final id = _captureFromMode(mode);
+    final id = _captureFromMode(mode, asOrganizeContext: asOrganizeContext);
     _recordCaptureLifecycle(evidenceId: id, mode: mode);
     _invalidateDerivedCaches();
     _syncRichBaseline();
@@ -470,6 +489,7 @@ class WorkspaceEvidenceController extends ChangeNotifier
     String? noteText,
     String? mimeType,
     bool linkToNearestPrimary = false,
+    bool asOrganizeContext = false,
   }) async {
     if (isArchivedReadOnly) {
       return '';
@@ -490,6 +510,7 @@ class WorkspaceEvidenceController extends ChangeNotifier
               mimeType: mimeType,
               captureSessionId: captureSessionId,
               linkToNearestPrimary: linkToNearestPrimary,
+              asOrganizeContext: asOrganizeContext,
             );
             _invalidateDerivedCaches();
             _syncRichBaseline();
@@ -503,11 +524,19 @@ class WorkspaceEvidenceController extends ChangeNotifier
   }
 
   /// In-memory preserve for FakeAsync widget tests (no CaptureSession store I/O).
-  String preserveForWidgetTest(WorkspaceCaptureMode mode, {String? noteText}) {
+  String preserveForWidgetTest(
+    WorkspaceCaptureMode mode, {
+    String? noteText,
+    bool asOrganizeContext = false,
+  }) {
     if (isArchivedReadOnly) {
       return '';
     }
-    final id = _captureFromMode(mode, noteText: noteText);
+    final id = _captureFromMode(
+      mode,
+      noteText: noteText,
+      asOrganizeContext: asOrganizeContext,
+    );
     final hash = (noteText != null && noteText.trim().isNotEmpty)
         ? EvidenceIntegrity.sha256OfUtf8(noteText.trim())
         : null;
@@ -518,7 +547,10 @@ class WorkspaceEvidenceController extends ChangeNotifier
   }
 
   /// Capture-bar text note — dedicated evidence, no silent parent attach.
-  Future<String> preserveTextNote(String text) async {
+  Future<String> preserveTextNote(
+    String text, {
+    bool asOrganizeContext = false,
+  }) async {
     final trimmed = text.trim();
     if (trimmed.isEmpty) {
       throw ArgumentError('Text note must not be empty');
@@ -527,6 +559,7 @@ class WorkspaceEvidenceController extends ChangeNotifier
       mode: WorkspaceCaptureMode.note,
       noteText: trimmed,
       linkToNearestPrimary: false,
+      asOrganizeContext: asOrganizeContext,
     );
   }
 
@@ -807,6 +840,7 @@ class WorkspaceEvidenceController extends ChangeNotifier
     String? mimeType,
     String? captureSessionId,
     bool linkToNearestPrimary = false,
+    bool asOrganizeContext = false,
   }) {
     if (EvidenceProjection.isCapturedCaptureMode(mode)) {
       return _aggregate.evidenceRepository
@@ -1214,8 +1248,28 @@ class WorkspaceEvidenceController extends ChangeNotifier
       return;
     }
     _aggregate.store.organizeCreatedEvidenceIds.add(id);
+    unawaited(_markCacheOrganizeContext(id));
     _invalidateDerivedCaches();
     _persistOrganizeContextSoon();
+  }
+
+  Future<void> _markCacheOrganizeContext(String evidenceId) async {
+    try {
+      final entry = await LocalEvidenceCache.byId(evidenceId);
+      if (entry == null) {
+        return;
+      }
+      await LocalEvidenceCache.upsert(
+        entry.copyWith(
+          metadata: {
+            ...entry.metadata,
+            'organizeContext': 'true',
+          },
+        ),
+      );
+    } catch (error) {
+      debugPrint('[Organize] cache context stamp skipped: $error');
+    }
   }
 
   /// Voice / Note / File from the Organize toolbar — not Capture chronology.
@@ -1232,7 +1286,10 @@ class WorkspaceEvidenceController extends ChangeNotifier
         'Organize context is Voice, Note, or File only',
       );
     }
-    final id = preserveEvidenceAndReturnId(mode);
+    final id = preserveEvidenceAndReturnId(
+      mode,
+      asOrganizeContext: true,
+    );
     registerOrganizeCreatedEvidence(id);
     return id;
   }
@@ -2010,3 +2067,4 @@ class WorkspaceEvidenceController extends ChangeNotifier
     } catch (_) {}
   }
 }
+
