@@ -1,0 +1,25 @@
+
+workflows:
+  ios_unsigned:
+    name: Evidence Vault - iOS Unsigned Build
+    max_build_duration: 120
+    instance_type: mac_mini_m2
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Get Flutter dependencies
+        script: flutter pub get
+
+      - name: Install CocoaPods dependencies
+        script: find . -name "Podfile" -execdir pod install \;
+
+      - name: Build iOS without code signing
+        script: flutter build ios --debug --no-codesign
+
+    artifacts:
+      - build/ios/iphoneos/**/*.app
+      - /tmp/xcodebuild_logs/*.log
