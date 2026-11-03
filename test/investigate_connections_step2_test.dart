@@ -20,7 +20,7 @@ import 'package:evidence_vault/screens/incident_workspace_shell.dart';
 import 'package:evidence_vault/screens/trust_package_screen.dart';
 import 'package:evidence_vault/widgets/evidence_inspector/evidence_inspector_preview.dart';
 import 'package:evidence_vault/widgets/evidence_inspector/evidence_spatial_carousel.dart';
-import 'package:evidence_vault/widgets/investigation/investigation_connections_canvas.dart';
+import 'package:evidence_vault/widgets/investigation/connections_tree_view.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_evidence_inspector_modal.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_journey_header.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_workspace_tab_bar.dart';
@@ -362,15 +362,15 @@ void main() {
 
       await _pumpConnections(tester, controller: controller);
 
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(find.text('My Connections'), findsNothing);
       expect(find.text('No explicit connections yet.'), findsNothing);
 
       await tester.ensureVisible(
-        find.byKey(InvestigationConnectionsCanvas.nodeKey(photoId)),
+        find.byKey(ConnectionsTreeView.nodeKey(photoId)),
       );
       await tester.tap(
-        find.byKey(InvestigationConnectionsCanvas.nodeKey(photoId)),
+        find.byKey(ConnectionsTreeView.nodeKey(photoId)),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -384,7 +384,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('Evidence Inspector'), findsNothing);
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(
         WorkspaceSession.instance.activeInvestigationTab,
         InvestigationWorkspaceTab.connections,
@@ -475,15 +475,8 @@ void main() {
 
       await _pumpConnections(tester, controller: controller);
 
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
-      expect(
-        find.byKey(InvestigationConnectionsCanvas.nodeKey('photo')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(InvestigationConnectionsCanvas.nodeKey('video')),
-        findsOneWidget,
-      );
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
+      expect(find.text('Evidence & Relationships'), findsNothing);
       expect(find.text('Linked evidence'), findsNothing);
       expect(find.text('Caused by'), findsNothing);
       expect(find.text('Proves'), findsNothing);
@@ -521,15 +514,10 @@ void main() {
 
       await _pumpConnections(tester, controller: controller);
 
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
+      expect(find.text('Evidence & Relationships'), findsNothing);
       expect(find.textContaining('supports Evidence'), findsNothing);
       expect(find.text('Caused by'), findsNothing);
-      for (final id in ids) {
-        expect(
-          find.byKey(InvestigationConnectionsCanvas.nodeKey(id)),
-          findsOneWidget,
-        );
-      }
     });
 
     testWidgets('9 empty structural copy when nothing is linked', (
@@ -541,7 +529,7 @@ void main() {
         photos: 1,
       );
       await _pumpConnections(tester, controller: controller);
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(find.text('My Connections'), findsNothing);
       expect(find.textContaining('Go to Organize'), findsNothing);
     });
@@ -559,7 +547,7 @@ void main() {
 
       await _pumpConnections(tester, controller: controller);
 
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(controller.state.relationshipGroups, hasLength(1));
       expect(find.text('Group 1'), findsNothing);
     });
@@ -577,7 +565,7 @@ void main() {
       );
       await _pumpConnections(tester, controller: controller);
 
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(find.text('My Connections'), findsNothing);
       expect(find.text('Create Group'), findsNothing);
       expect(find.byType(OrganizeWorkspaceView), findsNothing);
@@ -605,10 +593,10 @@ void main() {
 
       await _pumpConnections(tester, controller: controller);
       await tester.ensureVisible(
-        find.byKey(InvestigationConnectionsCanvas.nodeKey(photoId)),
+        find.byKey(ConnectionsTreeView.nodeKey(photoId)),
       );
       await tester.tap(
-        find.byKey(InvestigationConnectionsCanvas.nodeKey(photoId)),
+        find.byKey(ConnectionsTreeView.nodeKey(photoId)),
       );
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
@@ -671,7 +659,7 @@ void main() {
 
         await _tapStage(tester, 'Investigate');
         await _tapConnectionsTab(tester);
-        expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+        expect(find.byType(ConnectionsTreeView), findsOneWidget);
         expect(find.text('My Connections'), findsNothing);
         assertUnchanged();
 
@@ -682,3 +670,5 @@ void main() {
     );
   });
 }
+
+

@@ -69,6 +69,15 @@ class CachedEvidenceEntry {
       syncStatus == EvidenceSyncStatus.failed ||
       syncStatus == EvidenceSyncStatus.uploading;
 
+  /// True when this cache row is Organise context, not Library evidence.
+  bool get isLibraryContext {
+    final parent = parentEvidenceId?.trim() ?? '';
+    if (parent.isNotEmpty) {
+      return true;
+    }
+    return metadata['organizeContext'] == 'true';
+  }
+
   CachedEvidenceEntry copyWith({
     String? localFilePath,
     String? thumbnailPath,

@@ -211,7 +211,10 @@ class EvidenceWorkspaceContentState extends State<EvidenceWorkspaceContent> {
       if (!mounted || text == null || text.trim().isEmpty) {
         return;
       }
-      final id = await _controller.preserveTextNote(text);
+      final id = await _controller.preserveTextNote(
+        text,
+        asOrganizeContext: true,
+      );
       _controller.registerOrganizeCreatedEvidence(id);
       return;
     }

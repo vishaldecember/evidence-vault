@@ -54,6 +54,8 @@ class FirebaseIncidentRepository {
     required int narrativeCount,
     required int reconstructionHealth,
     int? evidenceCount,
+    int? contextEnrichedCount,
+    String? journeyStage,
   }) async {
     final data = FirestoreSerializers.incidentToMap(
       incident: incident,
@@ -63,6 +65,8 @@ class FirebaseIncidentRepository {
       narrativeCount: narrativeCount,
       reconstructionHealth: reconstructionHealth,
       evidenceCount: evidenceCount,
+      contextEnrichedCount: contextEnrichedCount,
+      journeyStage: journeyStage,
     );
 
     final batch = _db.batch();
@@ -138,12 +142,15 @@ class FirebaseIncidentRepository {
           evidenceCount: (doc.data()['evidenceCount'] as num?)?.toInt() ??
               (doc.data()['timelineCount'] as num?)?.toInt() ??
               0,
+          contextEnrichedCount:
+              (doc.data()['contextEnrichedCount'] as num?)?.toInt() ?? 0,
           relationshipCount:
               (doc.data()['relationshipCount'] as num?)?.toInt() ?? 0,
           narrativeCount:
               (doc.data()['narrativeCount'] as num?)?.toInt() ?? 0,
           reconstructionHealth:
               (doc.data()['reconstructionHealth'] as num?)?.toInt() ?? 0,
+          journeyStage: doc.data()['journeyStage'] as String?,
         ),
     ];
   }
@@ -309,6 +316,8 @@ class IncidentSummaryRecord {
     required this.relationshipCount,
     required this.narrativeCount,
     required this.reconstructionHealth,
+    this.contextEnrichedCount = 0,
+    this.journeyStage,
   });
 
   final Incident incident;
@@ -317,4 +326,6 @@ class IncidentSummaryRecord {
   final int relationshipCount;
   final int narrativeCount;
   final int reconstructionHealth;
+  final int contextEnrichedCount;
+  final String? journeyStage;
 }

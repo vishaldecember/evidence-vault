@@ -15,7 +15,7 @@ abstract final class ConnectionTraceEngine {
   static const double markSize = 31;
   static const double visualRadius = markSize / 2;
   static const double collisionRadius = 50;
-  static const double minSeparation = 120;
+  static const double minSeparation = 160;
   static const double _pad = 72;
 
   static ConnectionTraceSnapshot systemSnapshot({
@@ -99,7 +99,10 @@ abstract final class ConnectionTraceEngine {
       }
     }
 
-    for (final person in people.values) {
+    final evidenceCluster = [for (final node in nodes) node.position];
+    final personAccs = people.values.toList();
+    for (var i = 0; i < personAccs.length; i++) {
+      final person = personAccs[i];
       final related = [
         for (final node in nodes)
           if (person.evidenceIds.contains(node.id)) node.position,
@@ -108,7 +111,6 @@ abstract final class ConnectionTraceEngine {
         for (final item in items)
           if (person.evidenceIds.contains(item.id)) item.lastPreservedAt,
       ]..sort();
-      final anchor = _centroid(related);
       nodes.add(
         ConnectionTraceNode(
           id: person.id,
@@ -117,7 +119,13 @@ abstract final class ConnectionTraceEngine {
           timestamp: relatedTimes.isEmpty
               ? DateTime.fromMillisecondsSinceEpoch(0)
               : relatedTimes.first,
-          position: Offset(anchor.dx, anchor.dy - 96),
+          position: _regionalHubPosition(
+            related: related,
+            cluster: evidenceCluster,
+            kind: ConnectionTraceKind.person,
+            index: i,
+            count: personAccs.length,
+          ),
         ),
       );
       for (final evidenceId in person.evidenceIds) {
@@ -125,32 +133,42 @@ abstract final class ConnectionTraceEngine {
       }
     }
 
-    for (final collection in collections) {
-      if (collection.category != 'location' || collection.name.trim().isEmpty) {
-        continue;
-      }
-      final related = [
-        for (final node in nodes)
-          if (collection.memberEvidenceIds.contains(node.id)) node.position,
-      ];
-      if (related.isEmpty) {
-        continue;
-      }
-      final anchor = _centroid(related);
+    final locationHubs = <({EvidenceCollection collection, List<Offset> related})>[
+      for (final collection in collections)
+        if (collection.category == 'location' &&
+            collection.name.trim().isNotEmpty)
+          (
+            collection: collection,
+            related: [
+              for (final node in nodes)
+                if (node.evidenceId != null &&
+                    collection.memberEvidenceIds.contains(node.id))
+                  node.position,
+            ],
+          ),
+    ].where((hub) => hub.related.isNotEmpty).toList();
+    for (var i = 0; i < locationHubs.length; i++) {
+      final hub = locationHubs[i];
       nodes.add(
         ConnectionTraceNode(
-          id: collection.id,
+          id: hub.collection.id,
           kind: ConnectionTraceKind.location,
-          label: collection.name.trim(),
+          label: hub.collection.name.trim(),
           timestamp: items.isEmpty
               ? DateTime.fromMillisecondsSinceEpoch(0)
               : items.first.lastPreservedAt,
-          position: Offset(anchor.dx + 52, anchor.dy + 96),
+          position: _regionalHubPosition(
+            related: hub.related,
+            cluster: evidenceCluster,
+            kind: ConnectionTraceKind.location,
+            index: i,
+            count: locationHubs.length,
+          ),
         ),
       );
-      for (final id in collection.memberEvidenceIds) {
+      for (final id in hub.collection.memberEvidenceIds) {
         if (nodes.any((node) => node.id == id)) {
-          links.add(ConnectionTraceLink(fromId: id, toId: collection.id));
+          links.add(ConnectionTraceLink(fromId: id, toId: hub.collection.id));
         }
       }
     }
@@ -490,6 +508,32 @@ abstract final class ConnectionTraceEngine {
       components.add(component);
     }
     return components;
+  }
+
+  /// Person hubs sit to the right of related evidence; location hubs to the left.
+  /// Layout-only — does not change membership, endpoints, or chronology.
+  static Offset _regionalHubPosition({
+    required List<Offset> related,
+    required List<Offset> cluster,
+    required ConnectionTraceKind kind,
+    required int index,
+    required int count,
+  }) {
+    final anchor = _centroid(related);
+    final bounds = cluster.isEmpty ? related : cluster;
+    var minX = anchor.dx;
+    var maxX = anchor.dx;
+    for (final point in bounds) {
+      minX = math.min(minX, point.dx);
+      maxX = math.max(maxX, point.dx);
+    }
+    final spread = count <= 1
+        ? 0.0
+        : (index - (count - 1) / 2) * (minSeparation * 0.7);
+    final x = kind == ConnectionTraceKind.location
+        ? minX - minSeparation
+        : maxX + minSeparation;
+    return Offset(x, anchor.dy + spread);
   }
 
   static Offset _centroid(List<Offset> points) {

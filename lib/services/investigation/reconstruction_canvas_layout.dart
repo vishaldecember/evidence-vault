@@ -143,7 +143,7 @@ abstract final class ReconstructionCanvasLayout {
     final top = math.max(16.0, finger * 0.45);
     final row = finger * 3;
     final column = finger;
-    final clusterGap = markSize + 8;
+    final clusterGap = markSize;
     final fieldGap = finger;
     final axisClearance = 8.0;
     final fieldInset = markSize / 2 + axisClearance;
@@ -172,10 +172,7 @@ abstract final class ReconstructionCanvasLayout {
 
     final locationOf = <String, _Loc>{};
     for (final moment in moments) {
-      locationOf[moment.id] = _locationFor(
-        moment,
-        collections: collections,
-      );
+      locationOf[moment.id] = _locationFor(moment, collections: collections);
     }
 
     final contextItems = <WorkspaceEvidenceItem, WorkspaceEvidenceItem>{};
@@ -254,10 +251,6 @@ abstract final class ReconstructionCanvasLayout {
       }
     }
 
-    final plotWidth = math.max(
-      math.max(column, viewport.width.isFinite ? viewport.width - left : 0),
-      column + uniqueTimes.length * column,
-    );
     final plotHeight = math.max(row, bandKeys.length * row);
     final canvasHeight = math.max(
       viewport.height.isFinite && viewport.height > 0
@@ -266,7 +259,6 @@ abstract final class ReconstructionCanvasLayout {
       top + plotHeight + bottom,
     );
     final origin = Offset(left, canvasHeight - bottom);
-    final axisXEnd = Offset(left + plotWidth, origin.dy);
     final axisYEnd = Offset(left, top);
 
     double xFor(DateTime at) {
@@ -297,7 +289,7 @@ abstract final class ReconstructionCanvasLayout {
           kind: ReconstructionPlotKind.evidence,
           item: moment,
           locationKey: loc.key,
-          cluster: '${loc.key}::${at.millisecondsSinceEpoch}',
+          cluster: moment.id,
           x: xFor(at),
           y: yFor(loc.key),
         ),
@@ -313,16 +305,18 @@ abstract final class ReconstructionCanvasLayout {
           kind: ReconstructionPlotKind.context,
           item: entry.key,
           locationKey: loc.key,
-          cluster: '${loc.key}::${at.millisecondsSinceEpoch}',
+          cluster: host.id,
           x: xFor(at),
           y: yFor(loc.key),
         ),
       );
     }
 
+    final minY = axisYEnd.dy + markSize / 2 + axisClearance;
+    final maxY = origin.dy - markSize / 2 - axisClearance;
     final nodes = <ReconstructionPlotNode>[];
     for (final group in clusters.values) {
-      nodes.addAll(_spread(group, clusterGap));
+      nodes.addAll(_spread(group, clusterGap, minY: minY, maxY: maxY));
     }
     final separated = _clearOfAxes(
       _resolveOverlaps(nodes, fieldGap, clusterGap),
@@ -342,11 +336,20 @@ abstract final class ReconstructionCanvasLayout {
         ),
     ];
 
+    final xByMs = <int, double>{};
+    for (final moment in moments) {
+      for (final node in separated) {
+        if (node.id == moment.id) {
+          xByMs[_instant(moment).millisecondsSinceEpoch] = node.position.dx;
+          break;
+        }
+      }
+    }
     final timeMarks = [
       for (final at in uniqueTimes)
         ReconstructionTimeMark(
           at: at,
-          x: xFor(at),
+          x: xByMs[at.millisecondsSinceEpoch] ?? xFor(at),
           dateLabel: _dateLabel(at),
           timeLabel: _timeLabel(at),
         ),
@@ -362,20 +365,21 @@ abstract final class ReconstructionCanvasLayout {
       }
     }
 
+    final contentRight = _rightContentEdge(
+      nodes: separated,
+      timeMarks: timeMarks,
+      origin: origin,
+    );
+    final canvasWidth = math.max(contentRight + rightPad, left + column);
+
     return ReconstructionPlot(
       nodes: separated,
       bands: bands,
       timeMarks: timeMarks,
       storyPath: story,
-      size: Size(
-        math.max(
-          left + plotWidth + rightPad,
-          viewport.width.isFinite ? viewport.width : left + plotWidth,
-        ),
-        canvasHeight,
-      ),
+      size: Size(canvasWidth, canvasHeight),
       origin: origin,
-      axisXEnd: axisXEnd,
+      axisXEnd: Offset(contentRight, origin.dy),
       axisYEnd: axisYEnd,
     );
   }
@@ -447,10 +451,7 @@ abstract final class ReconstructionCanvasLayout {
         label: coordinateLabel(lat, lng),
       );
     }
-    return const _Loc(
-      key: unknownKey,
-      label: locationUnavailableLabel,
-    );
+    return const _Loc(key: unknownKey, label: locationUnavailableLabel);
   }
 
   static WorkspaceEvidenceItem? _bandSource(
@@ -482,46 +483,98 @@ abstract final class ReconstructionCanvasLayout {
     return key;
   }
 
+  static double _rightContentEdge({
+    required List<ReconstructionPlotNode> nodes,
+    required List<ReconstructionTimeMark> timeMarks,
+    required Offset origin,
+  }) {
+    var rightmost = origin.dx;
+    for (final node in nodes) {
+      rightmost = math.max(rightmost, node.position.dx);
+    }
+    for (final mark in timeMarks) {
+      rightmost = math.max(rightmost, mark.x);
+    }
+    return rightmost + markSize / 2;
+  }
+
+  static ReconstructionPlotNode _nodeAt(_Pending pending, Offset position) {
+    return ReconstructionPlotNode(
+      id: pending.id,
+      kind: pending.kind,
+      position: position,
+      item: pending.item,
+      locationKey: pending.locationKey,
+      cluster: pending.cluster,
+    );
+  }
+
   static List<ReconstructionPlotNode> _spread(
     List<_Pending> group,
-    double clusterGap,
-  ) {
+    double clusterGap, {
+    required double minY,
+    required double maxY,
+  }) {
+    final moments = [
+      for (final node in group)
+        if (node.kind == ReconstructionPlotKind.evidence) node,
+    ]..sort((a, b) => a.id.compareTo(b.id));
+    final contexts = [
+      for (final node in group)
+        if (node.kind == ReconstructionPlotKind.context) node,
+    ]..sort((a, b) => a.id.compareTo(b.id));
+
     final cx =
         group.map((node) => node.x).reduce((a, b) => a + b) / group.length;
     final cy =
         group.map((node) => node.y).reduce((a, b) => a + b) / group.length;
-    if (group.length == 1) {
-      final node = group.single;
-      return [
-        ReconstructionPlotNode(
-          id: node.id,
-          kind: node.kind,
-          position: Offset(cx, cy),
-          item: node.item,
-          locationKey: node.locationKey,
-          cluster: node.cluster,
-        ),
-      ];
+    final nodes = <ReconstructionPlotNode>[];
+    if (moments.isEmpty) {
+      nodes.addAll([
+        for (var i = 0; i < contexts.length; i++)
+          _nodeAt(contexts[i], Offset(cx, cy + i * clusterGap)),
+      ]);
+      return nodes;
     }
-    final n = group.length;
-    final radius = math.max(
-      clusterGap * 0.55,
-      (n - 1) * clusterGap / (2 * math.pi),
-    );
-    return [
-      for (var i = 0; i < n; i++)
-        ReconstructionPlotNode(
-          id: group[i].id,
-          kind: group[i].kind,
-          position: Offset(
-            cx + radius * math.cos(-math.pi / 2 + 2 * math.pi * i / n),
-            cy + radius * math.sin(-math.pi / 2 + 2 * math.pi * i / n),
-          ),
-          item: group[i].item,
-          locationKey: group[i].locationKey,
-          cluster: group[i].cluster,
+
+    for (var i = 0; i < moments.length; i++) {
+      final dy = moments.length == 1
+          ? 0.0
+          : (i - (moments.length - 1) / 2) * clusterGap;
+      nodes.add(_nodeAt(moments[i], Offset(cx, cy + dy)));
+    }
+    if (contexts.isEmpty) {
+      return nodes;
+    }
+
+    final anchor = nodes.first.position;
+    final roomAbove = anchor.dy - minY;
+    final roomBelow = maxY - anchor.dy;
+    final needed = contexts.length * clusterGap;
+    final up = roomAbove >= needed || roomAbove >= roomBelow;
+    final sign = up ? -1.0 : 1.0;
+    for (var i = 0; i < contexts.length; i++) {
+      nodes.add(
+        _nodeAt(
+          contexts[i],
+          Offset(anchor.dx, anchor.dy + sign * (i + 1) * clusterGap),
         ),
-    ];
+      );
+    }
+    return nodes;
+  }
+
+  static void _shiftCluster(
+    List<ReconstructionPlotNode> nodes,
+    String cluster,
+    Offset delta,
+  ) {
+    for (var i = 0; i < nodes.length; i++) {
+      if (nodes[i].cluster != cluster) {
+        continue;
+      }
+      nodes[i] = nodes[i].copyWith(position: nodes[i].position + delta);
+    }
   }
 
   static List<ReconstructionPlotNode> _resolveOverlaps(
@@ -545,12 +598,23 @@ abstract final class ReconstructionCanvasLayout {
           if (delta.distance >= minGap) {
             continue;
           }
+          if (a.cluster == b.cluster && a.cluster.isNotEmpty) {
+            continue;
+          }
+          final sameColumn = (a.position.dx - b.position.dx).abs() < 0.5;
+          if (sameColumn) {
+            final later = a.position.dy <= b.position.dy ? j : i;
+            final node = result[later];
+            final vertical = (a.position.dy - b.position.dy).abs();
+            final push = minGap - vertical + 0.5;
+            _shiftCluster(result, node.cluster, Offset(0, push));
+            moved = true;
+            continue;
+          }
           final later = a.position.dx <= b.position.dx ? j : i;
           final node = result[later];
           final push = minGap - delta.distance + 2;
-          result[later] = node.copyWith(
-            position: Offset(node.position.dx + push, node.position.dy),
-          );
+          _shiftCluster(result, node.cluster, Offset(push, 0));
           moved = true;
         }
       }

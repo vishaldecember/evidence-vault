@@ -36,10 +36,13 @@ class RiskCoachController extends ChangeNotifier {
   final RiskCoachPreferences _preferences;
   final IncidentLibraryService _library;
 
-  List<IncidentRiskAssessment> assessments = const [];
-  bool wellSupported = false;
-  bool _ready = false;
-  bool get isReady => _ready;
+
+List<IncidentRiskAssessment> assessments = const [];
+bool wellSupported = false;
+bool _ready = false;
+bool _disposed = false;
+bool get isReady => _ready;
+
 
   void _onIncidentChanged() {
     unawaited(refresh());
@@ -47,6 +50,7 @@ class RiskCoachController extends ChangeNotifier {
 
   Future<void> refresh({DateTime? now}) async {
     await _preferences.restore();
+    if (_disposed) return;
     final context = buildContext(now: now);
     wellSupported = _provider.looksWellSupported(context);
     final loaded = await _provider.assess(context);
@@ -130,11 +134,13 @@ class RiskCoachController extends ChangeNotifier {
     await refresh();
   }
 
-  @override
-  void dispose() {
-    _controller.removeListener(_onIncidentChanged);
-    super.dispose();
-  }
+ 
+@override
+void dispose() {
+  _disposed = true;
+  _controller.removeListener(_onIncidentChanged);
+  super.dispose();
+}
 
   @visibleForTesting
   void resetForTests() {

@@ -376,6 +376,7 @@ void main() {
       find.byKey(OrganizeChronologyCanvas.contextTileKey('note-org')),
     );
     await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
     expect(
       find.byKey(OrganizeChronologyCanvas.discardKey('note-org')),
       findsOneWidget,
@@ -815,7 +816,7 @@ void main() {
   });
 
   testWidgets(
-    'tapping a snapped context wobbles the instruction immediately',
+    'tapping a snapped context does not wobble the instruction',
     (tester) async {
       final note = _item(
         id: 'note-org',
@@ -873,6 +874,7 @@ void main() {
         find.byKey(OrganizeChronologyCanvas.contextTileKey('note-org')),
       );
       await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
 
       expect(
         tester
@@ -892,13 +894,14 @@ void main() {
               ),
             )
             .active,
-        isTrue,
+        isFalse,
       );
 
       await tester.tap(
         find.byKey(OrganizeChronologyCanvas.contextTileKey('voice-org')),
       );
       await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
       expect(
         tester
             .widget<OrganizePlacementWobble>(
@@ -907,7 +910,7 @@ void main() {
               ),
             )
             .active,
-        isTrue,
+        isFalse,
       );
     },
   );

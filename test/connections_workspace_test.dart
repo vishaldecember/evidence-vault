@@ -11,7 +11,7 @@ import 'package:evidence_vault/screens/investigation_workspace_screen.dart';
 import 'package:evidence_vault/services/investigation/user_connection_overlay_store.dart';
 import 'package:evidence_vault/services/relationship_group_color_service.dart';
 import 'package:evidence_vault/widgets/connections/connection_group_panel.dart';
-import 'package:evidence_vault/widgets/investigation/investigation_connections_canvas.dart';
+import 'package:evidence_vault/widgets/investigation/connections_tree_view.dart';
 import 'package:evidence_vault/widgets/workspace/organize_workspace_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -206,7 +206,7 @@ void main() {
 
       expect(find.byType(InvestigationWorkspaceScreen), findsOneWidget);
       expect(find.text('Investigation Workspace'), findsOneWidget);
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(find.text('My Connections'), findsNothing);
       expect(find.byType(ConnectionGroupPanel), findsNothing);
     });
@@ -269,7 +269,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.byType(InvestigationConnectionsCanvas), findsOneWidget);
+      expect(find.byType(ConnectionsTreeView), findsOneWidget);
       expect(find.text('My Connections'), findsNothing);
       expect(controller.state.relationshipGroups.single.id, groupId);
       expect(

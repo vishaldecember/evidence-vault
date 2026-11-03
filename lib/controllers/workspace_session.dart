@@ -61,6 +61,15 @@ class WorkspaceSession extends ChangeNotifier {
 
   Future<void>? _pendingOpenWork;
 
+  /// Set by Library "Add title" so Capture shows the title editor immediately.
+  bool requestTitleEdit = false;
+
+  bool consumeTitleEditRequest() {
+    final requested = requestTitleEdit;
+    requestTitleEdit = false;
+    return requested;
+  }
+
   /// Completes local hydrate started by [openIncident].
   ///
   /// Callers that need the working-set projection (e.g. Organize Readiness
@@ -509,6 +518,7 @@ class WorkspaceSession extends ChangeNotifier {
         return;
       }
       notifyListeners();
+      controller.publishLibraryComposition(allowZeroEvidence: true);
       // Cloud restore is secondary: never invent or copy evidence, and never
       // keep Library / Vault navigation waiting on Firestore.
       unawaited(_enrichOpenIncidentFromCloud(targetId, generation));
@@ -794,6 +804,7 @@ class WorkspaceSession extends ChangeNotifier {
     _restored = false;
     _pendingOpenWork = null;
     _openGeneration++;
+    requestTitleEdit = false;
     _resetNavigationState();
     notifyListeners();
   }

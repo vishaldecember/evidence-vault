@@ -33,6 +33,7 @@ abstract final class FileAttachmentPersist {
     EvidenceUploadCoordinator? uploadCoordinator,
     WorkspaceCaptureMode persistMode = WorkspaceCaptureMode.file,
     String? mimeType,
+    bool asOrganizeContext = false,
   }) async {
     if (!context.mounted) {
       FileFinalTrace.stage(
@@ -96,6 +97,7 @@ abstract final class FileAttachmentPersist {
         mimeType: mimeType,
         uploadCoordinator:
             uploadCoordinator ?? EvidenceUploadCoordinator.instance,
+        asOrganizeContext: asOrganizeContext,
       );
       FileFinalTrace.stage(
         'PERSIST_DIALOG_PRESERVE_OK',

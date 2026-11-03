@@ -15,6 +15,7 @@ class CockpitIncidentHeader extends StatefulWidget {
     required this.onTitleSaved,
     this.enabled = true,
     this.showPreservingLabel = true,
+    this.startEditing = false,
   });
 
   final String incidentTitle;
@@ -23,6 +24,9 @@ class CockpitIncidentHeader extends StatefulWidget {
 
   /// When false, only the editable title is shown (Workspace sticky footer).
   final bool showPreservingLabel;
+
+  /// Open the title field immediately (Library Add Title).
+  final bool startEditing;
 
   static bool isUntitled(String title) {
     final trimmed = title.trim();
@@ -44,6 +48,14 @@ class _CockpitIncidentHeaderState extends State<CockpitIncidentHeader> {
     super.initState();
     _controller = TextEditingController(text: _seedText(widget.incidentTitle));
     _focusNode = FocusNode();
+    if (widget.startEditing && widget.enabled) {
+      _editing = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _focusNode.requestFocus();
+        }
+      });
+    }
   }
 
   @override

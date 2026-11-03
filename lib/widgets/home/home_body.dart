@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../controllers/workspace_session.dart';
+import '../../domain/incident/incident_composition.dart';
 import '../../engines/library_insight_engine.dart';
 import '../../engines/rule_based_library_insight_engine.dart';
 import '../../models/library_incident_summary.dart';
@@ -101,12 +102,16 @@ class _HomeBodyState extends State<HomeBody> {
       ]),
       builder: (context, _) {
         final currentIncident = session.controller.currentIncident;
+        final composition = IncidentComposition.fromStore(
+          session.controller.aggregate.store,
+        );
         final display = HomeIncidentDisplayState.resolve(
           libraryIncidents: IncidentLibraryService.instance.summaries,
           sessionIncidentId: currentIncident.id,
           sessionTitle: currentIncident.title,
-          sessionEvidenceCount: currentIncident.evidenceCount,
+          sessionEvidenceCount: composition.evidenceCount,
           sessionNarrativeCount: currentIncident.narrativeEventCount,
+          sessionContextEnrichedCount: composition.contextEnrichedCount,
         );
         final libraryInsights = _computeLibraryInsights();
 

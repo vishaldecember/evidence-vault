@@ -490,6 +490,8 @@ abstract final class FileAttachRecovery {
       ),
       mimeType: mime,
       lockedIncidentId: intent.sourceIncidentId,
+      asOrganizeContext:
+          intent.modality == DurableAttachIntent.modalityOrganizeFile,
     );
     if (!preserved) {
       FileFinalTrace.failure(

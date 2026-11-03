@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
+import '../../controllers/workspace_session.dart';
 import '../../models/relationship_group.dart';
 import '../../models/journey_stage.dart';
 import '../../models/reflection_model.dart';
@@ -114,6 +115,9 @@ class _WorkspaceBodyState extends State<WorkspaceBody> {
   @override
   void initState() {
     super.initState();
+    if (WorkspaceSession.instance.consumeTitleEditRequest()) {
+      _identityDrawerExpanded = true;
+    }
     WidgetsBinding.instance.addPostFrameCallback(_measureActionLayer);
   }
 
@@ -320,6 +324,7 @@ class _WorkspaceBodyState extends State<WorkspaceBody> {
                             child: ContinueCapturingSection(
                               activeMode: widget.activeCaptureMode,
                               onModeSelected: widget.onCaptureModeSelected,
+                              identityDrawerExpanded: _identityDrawerExpanded,
                               identityDrawer: widget._showIdentityDrawer
                                   ? IncidentIdentityDrawer(
                                       key: ValueKey(

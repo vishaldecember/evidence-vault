@@ -31,7 +31,11 @@ abstract final class CurrentIncidentProjection {
           ),
         );
     final timelineAnchorCount =
-        aggregate.timelineRepository.orderedCapturedEvidenceIds().length;
+    aggregate.timelineRepository
+        .orderedCapturedEvidenceIds()
+        .where((id) => aggregate.store.capturedEvidence
+            .any((evidence) => evidence.id == id))
+        .length;
     final relationshipGroups = state.relationshipGroups;
     final resolvedNarrativeCount =
         narrativeEventCount ?? aggregate.narrativeEventRepository.events.length;

@@ -20,13 +20,6 @@ abstract final class AuthService {
   }) =>
       _auth.register(name: name, email: email, password: password);
 
-  /// Backward-compatible alias for [register].
-  static Future<void> createAccount({
-    required String name,
-    required String email,
-    required String password,
-  }) =>
-      register(name: name, email: email, password: password);
 
   static Future<void> signIn({
     required String email,
@@ -63,3 +56,4 @@ abstract final class AuthService {
 
   static String messageFor(AuthException error) => error.message;
 }
+

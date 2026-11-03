@@ -830,6 +830,7 @@ void main() {
       find.byKey(OrganizeChronologyCanvas.contextTileKey('note')),
     );
     await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
     final gesture = await tester.startGesture(
       tester.getCenter(
         find.byKey(OrganizeChronologyCanvas.contextTileKey('note')),
@@ -907,6 +908,7 @@ void main() {
       find.byKey(OrganizeChronologyCanvas.contextTileKey('note')),
     );
     await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
     final gesture = await tester.startGesture(
       tester.getCenter(
         find.byKey(OrganizeChronologyCanvas.contextTileKey('note')),
@@ -1160,6 +1162,72 @@ void main() {
       await tester.pump(kDoubleTapTimeout);
 
       expect(selected, ['note']);
+    },
+  );
+
+  testWidgets(
+    'sole connected context: double tap opens without clearing the anchor',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.binding.setSurfaceSize(const Size(390, 844));
+
+      final t0 = DateTime(2026, 8, 22, 10, 42);
+      final ordered = [
+        _item(id: 'photo', kind: WorkspaceEvidenceKind.image, at: t0),
+        _item(
+          id: 'note',
+          kind: WorkspaceEvidenceKind.note,
+          at: t0.add(const Duration(seconds: 15)),
+        ),
+      ];
+      final selected = <String>[];
+      final cleared = <String>[];
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: Scaffold(
+            body: OrganizeChronologyCanvas(
+              ordered: ordered,
+              allEvidence: ordered,
+              organizeCreatedIds: const {'note'},
+              anchors: const [
+                OrganizeContextAnchor(
+                  contextEvidenceId: 'note',
+                  capturedEvidenceId: 'photo',
+                ),
+              ],
+              onEvidenceSelected: (item) => selected.add(item.id),
+              onSetContextAnchor: (_, _) {},
+              onClearContextAnchor: cleared.add,
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      final note = find.byKey(OrganizeWorkspaceView.rowKey('note'));
+      await tester.tap(note);
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(note);
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+
+      expect(selected, ['note']);
+      expect(cleared, isEmpty);
+      expect(
+        find.byKey(OrganizeChronologyCanvas.contextArrowKey('note')),
+        findsOneWidget,
+      );
+      expect(
+        tester
+            .widget<OrganizePlacementWobble>(
+              find.byKey(
+                OrganizeChronologyCanvas.awaitingPlacementKey('note'),
+              ),
+            )
+            .active,
+        isFalse,
+      );
     },
   );
 

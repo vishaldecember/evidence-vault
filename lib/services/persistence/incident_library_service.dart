@@ -11,6 +11,7 @@ import '../../domain/incident/incident.dart';
 import '../../domain/incident/incident_deletion_lifecycle.dart';
 import '../../domain/incident/incident_status.dart';
 import '../../domain/incident/incident_title.dart';
+import '../../models/journey_stage.dart';
 import '../../models/library_incident_record.dart';
 import '../../models/library_incident_summary.dart';
 import '../../repositories/firebase/firebase_incident_repository.dart';
@@ -18,6 +19,7 @@ import '../auth/firebase_bootstrap.dart';
 import '../storage/local_evidence_cache.dart';
 import '../user_session_service.dart';
 import 'incident_owned_deletion_service.dart';
+import 'vault_wipe_pending.dart';
 
 /// Loads every incident the signed-in investigator has preserved, for the
 /// Home Library preview and the Vault (Sprint 4D).
@@ -64,6 +66,7 @@ class IncidentLibraryService extends ChangeNotifier {
 
   bool _isLoading = false;
   bool get isLoading => _isLoading;
+  int _generation = 0;
 
   bool isArchivedId(String incidentId) =>
       _archivedIds.contains(incidentId) &&
@@ -110,6 +113,13 @@ class IncidentLibraryService extends ChangeNotifier {
     if (userId == null || userId.isEmpty) {
       return;
     }
+    final generation = _generation;
+
+    await _completePendingVaultWipe(userId);
+    if (generation != _generation) {
+      return;
+    }
+    final pendingWipeIds = await VaultWipePending.incidentIdsFor(userId);
 
     _isLoading = true;
     var newSummaries = List<LibraryIncidentSummary>.from(summaries);
@@ -125,6 +135,9 @@ class IncidentLibraryService extends ChangeNotifier {
           final incident = entry.incident;
           if (incident.id.trim().isEmpty) {
             debugPrint('[Library] skipping summary with empty incident id');
+            continue;
+          }
+          if (pendingWipeIds.contains(incident.id)) {
             continue;
           }
           final title = incident.title.trim().isEmpty
@@ -145,7 +158,7 @@ class IncidentLibraryService extends ChangeNotifier {
               id: incident.id,
               title: title,
               evidenceCount: entry.evidenceCount,
-              contextEnrichedCount: entry.relationshipCount,
+              contextEnrichedCount: entry.contextEnrichedCount,
               integrityVerified: entry.reconstructionHealth >= 50,
               lastPreserved: _formatLastPreserved(incident.updatedAt),
               narrativeCount: entry.narrativeCount,
@@ -156,6 +169,7 @@ class IncidentLibraryService extends ChangeNotifier {
               coverEvidenceId: incident.coverEvidenceId,
               createdAt: incident.createdAt,
               updatedAt: incident.updatedAt,
+              journeyStage: _journeyStageFrom(entry.journeyStage),
             ),
           );
           newRecords.add(
@@ -172,7 +186,12 @@ class IncidentLibraryService extends ChangeNotifier {
         userId: userId,
         summaries: newSummaries,
         records: newRecords,
+        excludedIncidentIds: pendingWipeIds,
       );
+
+      if (generation != _generation) {
+        return;
+      }
 
       summaries = newSummaries;
       records = newRecords;
@@ -183,11 +202,18 @@ class IncidentLibraryService extends ChangeNotifier {
       debugPrint('$stack');
       // Offline / cloud failure — still try to surface local counts.
       try {
+        if (generation != _generation) {
+          return;
+        }
         await _mergeLocalEvidenceCounts(
           userId: userId,
           summaries: newSummaries,
           records: newRecords,
+          excludedIncidentIds: pendingWipeIds,
         );
+        if (generation != _generation) {
+          return;
+        }
         summaries = newSummaries;
         records = newRecords;
       } catch (mergeError) {
@@ -214,6 +240,9 @@ class IncidentLibraryService extends ChangeNotifier {
     String title = '',
     DateTime? updatedAt,
     bool isInProgress = true,
+    int? contextEnrichedCount,
+    JourneyStage? journeyStage,
+    bool allowZeroEvidence = false,
   }) {
     final id = incidentId.trim();
     if (id.isEmpty) {
@@ -230,7 +259,7 @@ class IncidentLibraryService extends ChangeNotifier {
       if (s.id == id) {
         found = true;
         // Keep last known valid count across empty-shell open transitions.
-        final nextCount = (s.evidenceCount > 0 && count == 0)
+        final nextCount = (!allowZeroEvidence && s.evidenceCount > 0 && count == 0)
             ? s.evidenceCount
             : count;
         final recentlyDeleted =
@@ -241,6 +270,8 @@ class IncidentLibraryService extends ChangeNotifier {
           s.copyWith(
             title: display,
             evidenceCount: nextCount,
+            contextEnrichedCount:
+                contextEnrichedCount ?? s.contextEnrichedCount,
             lastPreserved: lastPreserved,
             isInProgress: (archived || recentlyDeleted) ? false : isInProgress,
             isArchived: archived,
@@ -248,6 +279,7 @@ class IncidentLibraryService extends ChangeNotifier {
             deletedAt: _deletedAtById[id] ?? s.deletedAt,
             createdAt: s.createdAt ?? preservedAt,
             updatedAt: preservedAt,
+            journeyStage: journeyStage ?? s.journeyStage,
           ),
         );
       } else {
@@ -263,7 +295,7 @@ class IncidentLibraryService extends ChangeNotifier {
           id: id,
           title: display,
           evidenceCount: count,
-          contextEnrichedCount: 0,
+          contextEnrichedCount: contextEnrichedCount ?? 0,
           integrityVerified: false,
           lastPreserved: lastPreserved,
           narrativeCount: 0,
@@ -273,6 +305,7 @@ class IncidentLibraryService extends ChangeNotifier {
           deletedAt: _deletedAtById[id],
           createdAt: preservedAt,
           updatedAt: preservedAt,
+          journeyStage: journeyStage ?? JourneyStage.empty,
         ),
       );
     }
@@ -384,6 +417,7 @@ class IncidentLibraryService extends ChangeNotifier {
 
   /// Clears cached state — for sign-out and account/vault deletion flows.
   void clear() {
+    _generation++;
     summaries = [];
     records = [];
     _archivedIds.clear();
@@ -569,12 +603,17 @@ class IncidentLibraryService extends ChangeNotifier {
     required String userId,
     required List<LibraryIncidentSummary> summaries,
     required List<LibraryIncidentRecord> records,
+    Set<String> excludedIncidentIds = const {},
   }) async {
     final all = await LocalEvidenceCache.all();
-    final counts = <String, int>{};
+    final evidenceCounts = <String, int>{};
+    final contextCounts = <String, int>{};
     final latest = <String, DateTime>{};
     for (final entry in all) {
       if (entry.incidentId.isEmpty) {
+        continue;
+      }
+      if (excludedIncidentIds.contains(entry.incidentId)) {
         continue;
       }
       if (entry.userId.isNotEmpty &&
@@ -582,28 +621,42 @@ class IncidentLibraryService extends ChangeNotifier {
           entry.userId != userId) {
         continue;
       }
-      counts[entry.incidentId] = (counts[entry.incidentId] ?? 0) + 1;
+      if (entry.isLibraryContext) {
+        contextCounts[entry.incidentId] =
+            (contextCounts[entry.incidentId] ?? 0) + 1;
+      } else {
+        evidenceCounts[entry.incidentId] =
+            (evidenceCounts[entry.incidentId] ?? 0) + 1;
+      }
       final prev = latest[entry.incidentId];
       if (prev == null || entry.capturedAt.isAfter(prev)) {
         latest[entry.incidentId] = entry.capturedAt;
       }
     }
-    if (counts.isEmpty) {
+    if (evidenceCounts.isEmpty && contextCounts.isEmpty) {
       return;
     }
 
+    final incidentIds = {
+      ...evidenceCounts.keys,
+      ...contextCounts.keys,
+    };
     final byId = {for (final s in summaries) s.id: s};
-    for (final entry in counts.entries) {
-      final id = entry.key;
-      final localCount = entry.value;
+    for (final id in incidentIds) {
+      final localEvidence = evidenceCounts[id] ?? 0;
+      final localContext = contextCounts[id] ?? 0;
       final existing = byId[id];
       if (existing != null) {
-        final merged = math.max(existing.evidenceCount, localCount);
-        if (merged != existing.evidenceCount) {
+        final mergedEvidence = math.max(existing.evidenceCount, localEvidence);
+        final mergedContext =
+            math.max(existing.contextEnrichedCount, localContext);
+        if (mergedEvidence != existing.evidenceCount ||
+            mergedContext != existing.contextEnrichedCount) {
           final idx = summaries.indexWhere((s) => s.id == id);
           if (idx != -1) {
             summaries[idx] = existing.copyWith(
-              evidenceCount: merged,
+              evidenceCount: mergedEvidence,
+              contextEnrichedCount: mergedContext,
               updatedAt: existing.updatedAt ?? latest[id],
             );
           }
@@ -618,8 +671,8 @@ class IncidentLibraryService extends ChangeNotifier {
           LibraryIncidentSummary(
             id: id,
             title: 'Untitled Incident',
-            evidenceCount: localCount,
-            contextEnrichedCount: 0,
+            evidenceCount: localEvidence,
+            contextEnrichedCount: localContext,
             integrityVerified: false,
             lastPreserved: _formatLastPreserved(when),
             narrativeCount: 0,
@@ -629,6 +682,9 @@ class IncidentLibraryService extends ChangeNotifier {
             deletedAt: _deletedAtById[id],
             createdAt: when,
             updatedAt: when,
+            journeyStage: localEvidence == 0
+                ? JourneyStage.empty
+                : JourneyStage.building,
           ),
         );
         records.insert(
@@ -813,6 +869,41 @@ class IncidentLibraryService extends ChangeNotifier {
 
   static bool _isActiveStatus(IncidentStatus status) =>
       status == IncidentStatus.draft || status == IncidentStatus.active;
+
+  Future<void> _completePendingVaultWipe(String userId) async {
+    final pending = await VaultWipePending.incidentIdsFor(userId);
+    if (pending.isEmpty || !_enabled) {
+      return;
+    }
+    final deleted = <String>[];
+    for (final id in pending) {
+      try {
+        await _repository.deleteOwnedIncidentTree(
+          userId: userId,
+          incidentId: id,
+        );
+        deleted.add(id);
+      } catch (error) {
+        debugPrint('[Library] pending vault wipe skipped $id: $error');
+      }
+    }
+    if (deleted.isNotEmpty) {
+      await VaultWipePending.removeIds(deleted);
+    }
+  }
+
+  static JourneyStage _journeyStageFrom(String? raw) {
+    switch (raw?.trim()) {
+      case 'building':
+        return JourneyStage.building;
+      case 'rich':
+        return JourneyStage.rich;
+      case 'reflective':
+        return JourneyStage.reflective;
+      default:
+        return JourneyStage.empty;
+    }
+  }
 
   static String _formatLastPreserved(DateTime updatedAt) {
     final now = DateTime.now();

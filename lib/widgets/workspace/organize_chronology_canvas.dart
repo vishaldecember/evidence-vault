@@ -1267,7 +1267,10 @@ class _OrganizeUnsnappedContextObjectState
   }
 
   void _onDoubleTap() {
-    if (!widget.wobbling || _openQueued) {
+    if (_openQueued) {
+      return;
+    }
+    if (!widget.wobbling && !widget.linked) {
       return;
     }
     _openQueued = true;
@@ -1293,7 +1296,7 @@ class _OrganizeUnsnappedContextObjectState
         draggable: widget.wobbling && widget.placementEnabled,
         confirming: widget.confirming,
         onTap: widget.linked && !widget.wobbling ? _onTap : null,
-        onDoubleTap: widget.wobbling ? _onDoubleTap : null,
+        onDoubleTap: widget.wobbling || widget.linked ? _onDoubleTap : null,
         onPointerDown: widget.onContextPointerDown,
         onPointerMove: widget.onContextPointerMove,
         onPointerUp: widget.onContextPointerUp,

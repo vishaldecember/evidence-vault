@@ -15,6 +15,7 @@ class ContinueCapturingSection extends StatelessWidget {
     required this.activeMode,
     required this.onModeSelected,
     this.identityDrawer,
+    this.identityDrawerExpanded = false,
   });
 
   final WorkspaceCaptureMode? activeMode;
@@ -22,11 +23,13 @@ class ContinueCapturingSection extends StatelessWidget {
 
   /// Name Incident extension — top edge of the Capture card when set.
   final Widget? identityDrawer;
+  final bool identityDrawerExpanded;
 
   @override
   Widget build(BuildContext context) {
     return _CaptureEvidenceCard(
       identityDrawer: identityDrawer,
+      identityDrawerExpanded: identityDrawerExpanded,
       activeMode: activeMode,
       onModeSelected: onModeSelected,
     );
@@ -37,11 +40,13 @@ class ContinueCapturingSection extends StatelessWidget {
 class _CaptureEvidenceCard extends StatelessWidget {
   const _CaptureEvidenceCard({
     this.identityDrawer,
+    this.identityDrawerExpanded = false,
     required this.activeMode,
     required this.onModeSelected,
   });
 
   final Widget? identityDrawer;
+  final bool identityDrawerExpanded;
   final WorkspaceCaptureMode? activeMode;
   final ValueChanged<WorkspaceCaptureMode> onModeSelected;
 
@@ -64,7 +69,9 @@ class _CaptureEvidenceCard extends StatelessWidget {
         children: [
           if (identityDrawer != null)
             SizedBox(
-              height: IncidentIdentityDrawer.collapsedTabHeight,
+              height: identityDrawerExpanded
+                  ? IncidentIdentityDrawer.fieldHeight
+                  : IncidentIdentityDrawer.collapsedTabHeight,
               child: identityDrawer!,
             ),
           Padding(

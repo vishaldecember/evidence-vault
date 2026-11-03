@@ -332,58 +332,42 @@ class _VideoPreview extends StatelessWidget {
 class _VoicePreview extends StatelessWidget {
   const _VoicePreview();
 
-  static const _barHeights = <double>[8, 14, 20, 12, 24, 16, 22, 11, 18, 9];
+  static const _barHeights = <double>[0.28, 0.48, 0.72, 0.4, 0.88, 0.56, 0.78, 0.36, 0.64, 0.3];
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0B1F4A), AppColors.navy, Color(0xFF1A3A7A)],
-        ),
-      ),
+    return ColoredBox(
+      color: AppColors.captureSurface,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(
           children: [
             Container(
               width: 22,
               height: 22,
-              decoration: BoxDecoration(
-                color: AppColors.onPrimary.withValues(alpha: 0.14),
+              decoration: const BoxDecoration(
+                color: AppColors.primary,
                 shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.onPrimary.withValues(alpha: 0.22),
-                ),
               ),
               child: const Icon(
-                Icons.mic_rounded,
-                size: 13,
+                Icons.play_arrow_rounded,
+                size: 14,
                 color: AppColors.onPrimary,
               ),
             ),
-            const SizedBox(width: 5),
+            const SizedBox(width: 6),
             Expanded(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   for (final height in _barHeights)
                     Container(
-                      width: 2.2,
-                      height: height * 0.85,
+                      width: 2.4,
+                      height: 22 * height,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(1.5),
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [
-                            AppColors.onPrimary.withValues(alpha: 0.35),
-                            AppColors.onPrimary.withValues(alpha: 0.92),
-                          ],
-                        ),
+                        color: AppColors.primary.withValues(alpha: 0.78),
                       ),
                     ),
                 ],

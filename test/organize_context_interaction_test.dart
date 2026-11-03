@@ -15,6 +15,7 @@ import 'package:evidence_vault/widgets/workspace/organize_composition_matrix.dar
 import 'package:evidence_vault/widgets/workspace/organize_readiness_guide.dart';
 import 'package:evidence_vault/widgets/workspace/organize_workspace_view.dart';
 import 'package:evidence_vault/widgets/workspace/product_concept_chart.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -160,6 +161,7 @@ Future<void> _armAndDragAway(
   final finder = find.byKey(OrganizeChronologyCanvas.contextTileKey(contextId));
   await tester.tap(finder);
   await tester.pump();
+  await tester.pump(kDoubleTapTimeout);
   final gesture = await tester.startGesture(
     tester.getCenter(finder) + const Offset(16, 16),
   );
@@ -770,6 +772,7 @@ void main() {
       find.byKey(OrganizeChronologyCanvas.contextTileKey('note-org')),
     );
     await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
 
     expect(
       find.byKey(OrganizeChronologyCanvas.discardKey('note-org')),

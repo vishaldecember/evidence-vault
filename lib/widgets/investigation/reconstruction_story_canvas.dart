@@ -62,9 +62,7 @@ class _ReconstructionStoryCanvasState extends State<ReconstructionStoryCanvas> {
       return;
     }
     setState(() {
-      _revealedLocationKey = _revealedLocationKey == band.key
-          ? null
-          : band.key;
+      _revealedLocationKey = _revealedLocationKey == band.key ? null : band.key;
     });
   }
 
@@ -73,6 +71,20 @@ class _ReconstructionStoryCanvasState extends State<ReconstructionStoryCanvas> {
       return null;
     }
     return EvidenceFormatters.coordinates(band.latitude, band.longitude);
+  }
+
+  bool _shouldOpenConnectedContext(ReconstructionPlotNode node) {
+    if (node.kind != ReconstructionPlotKind.context || node.cluster.isEmpty) {
+      return false;
+    }
+    var count = 0;
+    for (final other in plot.nodes) {
+      if (other.kind == ReconstructionPlotKind.context &&
+          other.cluster == node.cluster) {
+        count += 1;
+      }
+    }
+    return count == 1;
   }
 
   @override
@@ -142,7 +154,7 @@ class _ReconstructionStoryCanvasState extends State<ReconstructionStoryCanvas> {
                 for (final mark in plot.timeMarks)
                   Positioned(
                     key: ReconstructionStoryCanvas.timeMarkKey(mark.at),
-                    left: mark.x - (plot.origin.dx * 0.45).clamp(22.0, 28.0),
+                    left: mark.x - (plot.origin.dx).clamp(40.0, 56.0) / 2,
                     top: plot.origin.dy + 6,
                     width: (plot.origin.dx).clamp(40.0, 56.0),
                     child: Column(
@@ -189,6 +201,12 @@ class _ReconstructionStoryCanvasState extends State<ReconstructionStoryCanvas> {
                           _dismissLocationCoordinates();
                           widget.onEvidenceTap(node.item);
                         },
+                        onDoubleTap: _shouldOpenConnectedContext(node)
+                            ? () {
+                                _dismissLocationCoordinates();
+                                widget.onEvidenceTap(node.item);
+                              }
+                            : null,
                         child: InvestigationEvidenceMark(
                           kind: node.item.kind,
                           color: node.kind == ReconstructionPlotKind.context
@@ -199,8 +217,7 @@ class _ReconstructionStoryCanvasState extends State<ReconstructionStoryCanvas> {
                       ),
                     ),
                   ),
-                if (_revealedLocationKey != null)
-                  ..._gpsCoordinateTitle(),
+                if (_revealedLocationKey != null) ..._gpsCoordinateTitle(),
               ],
             ),
           ),
@@ -230,10 +247,9 @@ class _ReconstructionStoryCanvasState extends State<ReconstructionStoryCanvas> {
     }
     const boxHeight = 30.0;
     const boxMaxWidth = 268.0;
-    final left = plot.origin.dx.clamp(
-      8.0,
-      math.max(8.0, plot.size.width - boxMaxWidth - 8),
-    ).toDouble();
+    final left = plot.origin.dx
+        .clamp(8.0, math.max(8.0, plot.size.width - boxMaxWidth - 8))
+        .toDouble();
     var top = band.y - 22 - boxHeight - 6;
     if (top < 4) {
       top = 4;

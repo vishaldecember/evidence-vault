@@ -17,9 +17,8 @@ import 'package:evidence_vault/services/investigation/connection_trace_engine.da
 import 'package:evidence_vault/services/investigation/spatial_graph_layout.dart';
 import 'package:evidence_vault/services/investigation/user_connection_overlay_store.dart';
 import 'package:evidence_vault/services/relationship/relationship_engine.dart';
-import 'package:evidence_vault/theme/app_colors.dart';
 import 'package:evidence_vault/widgets/workspace/journey_evidence_thumbnail.dart';
-import 'package:evidence_vault/widgets/investigation/investigation_connections_canvas.dart';
+import 'package:evidence_vault/widgets/investigation/connections_workspace.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_graph_workspace.dart';
 import 'package:evidence_vault/widgets/investigation/investigation_workspace_tab_bar.dart';
 import 'package:evidence_vault/widgets/timeline/timeline_anchor_entry.dart';
@@ -299,12 +298,25 @@ void main() {
         kind: WorkspaceEvidenceKind.video,
         lastPreservedAt: DateTime(2026, 8, 14, 10, 50),
       );
+      final photoNote = _item(
+        id: 'photo-note',
+        kind: WorkspaceEvidenceKind.note,
+        parentEvidenceId: 'photo',
+        isContextual: true,
+      );
+      final clipNote = _item(
+        id: 'clip-note',
+        kind: WorkspaceEvidenceKind.note,
+        parentEvidenceId: 'clip',
+        isContextual: true,
+      );
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: InvestigationConnectionsCanvas(
+            body: ConnectionsWorkspace(
               incidentId: 'inc-A',
-              evidence: [photo, clip],
+              evidence: [photo, clip, photoNote, clipNote],
+              collections: const [],
               relationships: [
                 EvidenceRelationship(
                   id: 'rel-1',
@@ -324,10 +336,7 @@ void main() {
       expect(find.byType(Image), findsNothing);
       expect(find.byIcon(Icons.photo_outlined), findsOneWidget);
       expect(find.byIcon(Icons.videocam_outlined), findsOneWidget);
-      expect(
-        find.byKey(InvestigationConnectionsCanvas.edgesKey),
-        findsOneWidget,
-      );
+      expect(find.byType(ConnectionsWorkspace), findsOneWidget);
       expect(find.byKey(InvestigationGraphWorkspace.spineKey), findsNothing);
     });
   });
@@ -588,12 +597,19 @@ void main() {
         kind: WorkspaceEvidenceKind.video,
         lastPreservedAt: DateTime(2026, 8, 14, 10, 50),
       );
+      final photoNote = _item(
+        id: 'photo-note',
+        kind: WorkspaceEvidenceKind.note,
+        parentEvidenceId: 'photo',
+        isContextual: true,
+      );
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: InvestigationConnectionsCanvas(
+            body: ConnectionsWorkspace(
               incidentId: 'inc-A',
-              evidence: [photo, clip],
+              evidence: [photo, clip, photoNote],
+              collections: const [],
               relationships: [
                 EvidenceRelationship(
                   id: 'rel-1',
@@ -617,22 +633,6 @@ void main() {
     });
 
     test('system and investigator traces keep distinct connection colors', () {
-      expect(
-        InvestigationConnectionsCanvas.systemLinkColor,
-        AppColors.connectionSystem,
-      );
-      expect(
-        InvestigationConnectionsCanvas.mineLinkColor,
-        AppColors.connectionMine,
-      );
-      expect(
-        InvestigationConnectionsCanvas.systemLinkColor,
-        isNot(InvestigationConnectionsCanvas.mineLinkColor),
-      );
-      expect(
-        InvestigationConnectionsCanvas.mineLinkColor,
-        AppColors.connectionMine,
-      );
 
       final photo = _item(id: 'photo');
       final note = _item(
@@ -712,3 +712,7 @@ void main() {
     });
   });
 }
+
+
+
+

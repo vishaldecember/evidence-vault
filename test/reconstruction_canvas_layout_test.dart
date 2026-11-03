@@ -235,10 +235,11 @@ void main() {
         expect(note.kind, ReconstructionPlotKind.context);
         expect(
           (photo.position - note.position).distance,
-          greaterThanOrEqualTo(ConnectionTraceEngine.markSize),
+          closeTo(ConnectionTraceEngine.markSize, 0.51),
         );
-        expect((photo.position - note.position).distance, lessThan(80));
+        expect(note.position.dx, closeTo(photo.position.dx, 0.5));
         expect(plot.timeMarks, hasLength(1));
+        expect(plot.timeMarks.single.x, closeTo(photo.position.dx, 0.5));
       },
     );
 
@@ -344,6 +345,9 @@ void main() {
       expect(firstGap, greaterThan(30));
       expect((firstGap - secondGap).abs(), lessThan(8));
       expect(plot.timeMarks, hasLength(3));
+      expect(plot.timeMarks[0].x, closeTo(a.position.dx, 0.5));
+      expect(plot.timeMarks[1].x, closeTo(b.position.dx, 0.5));
+      expect(plot.timeMarks[2].x, closeTo(c.position.dx, 0.5));
     });
 
     test('Y spacing is ordinal location rows, not geographic distance', () {
@@ -400,6 +404,77 @@ void main() {
       );
     });
 
+    test('connected contexts stack and touch the moment circumference', () {
+      final at = DateTime.utc(2026, 8, 28, 10, 2);
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(id: 'photo', capturedAt: at, latitude: 27.1, longitude: 85.3),
+          _item(
+            id: 'note',
+            kind: WorkspaceEvidenceKind.note,
+            capturedAt: at,
+          ),
+          _item(
+            id: 'voice',
+            kind: WorkspaceEvidenceKind.voice,
+            capturedAt: at,
+          ),
+          _item(
+            id: 'file',
+            kind: WorkspaceEvidenceKind.attachment,
+            capturedAt: at,
+          ),
+        ],
+        organizeCreatedIds: const {'note', 'voice', 'file'},
+        contextAnchors: const [
+          OrganizeContextAnchor(
+            contextEvidenceId: 'note',
+            capturedEvidenceId: 'photo',
+          ),
+          OrganizeContextAnchor(
+            contextEvidenceId: 'voice',
+            capturedEvidenceId: 'photo',
+          ),
+          OrganizeContextAnchor(
+            contextEvidenceId: 'file',
+            capturedEvidenceId: 'photo',
+          ),
+        ],
+      );
+
+      final photo = plot.nodeById('photo')!;
+      final stacked = [
+        plot.nodeById('note')!,
+        plot.nodeById('voice')!,
+        plot.nodeById('file')!,
+      ]..sort((a, b) => a.position.dy.compareTo(b.position.dy));
+
+      for (final context in stacked) {
+        expect(context.position.dx, closeTo(photo.position.dx, 0.5));
+        expect(context.kind, ReconstructionPlotKind.context);
+      }
+      expect(plot.timeMarks.single.x, closeTo(photo.position.dx, 0.5));
+
+      final column = [...stacked]
+        ..sort(
+          (a, b) => (a.position.dy - photo.position.dy).abs().compareTo(
+            (b.position.dy - photo.position.dy).abs(),
+          ),
+        );
+      expect(
+        (column[0].position - photo.position).distance,
+        closeTo(ConnectionTraceEngine.markSize, 0.51),
+      );
+      expect(
+        (column[1].position - column[0].position).distance,
+        closeTo(ConnectionTraceEngine.markSize, 0.51),
+      );
+      expect(
+        (column[2].position - column[1].position).distance,
+        closeTo(ConnectionTraceEngine.markSize, 0.51),
+      );
+    });
+
     test('axes sit one finger from the left and bottom of the viewport', () {
       const viewport = Size(390, 844);
       final plot = ReconstructionCanvasLayout.fromEvidence(
@@ -418,6 +493,346 @@ void main() {
       expect(plot.origin.dy, closeTo(viewport.height - finger, 1));
       expect(plot.axisYEnd.dx, plot.origin.dx);
       expect(plot.axisXEnd.dy, plot.origin.dy);
+    });
+
+    test(
+      'canvas width stops after the rightmost evidence plus trailing margin',
+      () {
+        const viewport = Size(1200, 844);
+        final plot = ReconstructionCanvasLayout.fromEvidence(
+          evidence: [
+            _item(
+              id: 'photo',
+              capturedAt: DateTime.utc(2026, 8, 28, 7, 15, 30),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+          ],
+          viewport: viewport,
+        );
+        final rightmost = plot.nodes.single.position.dx;
+        expect(plot.size.width.isFinite, isTrue);
+        expect(
+          plot.size.width,
+          closeTo(
+            rightmost +
+                ReconstructionCanvasLayout.markSize / 2 +
+                ReconstructionCanvasLayout.rightPad,
+            0.5,
+          ),
+        );
+        expect(plot.size.width, lessThan(viewport.width));
+        expect(
+          plot.axisXEnd.dx,
+          closeTo(rightmost + ReconstructionCanvasLayout.markSize / 2, 0.5),
+        );
+      },
+    );
+
+    test('CASE A: one evidence keeps ordinal X and a finite right edge', () {
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(
+            id: 'photo',
+            capturedAt: DateTime.utc(2026, 8, 28, 7, 15, 30),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+        ],
+      );
+      expect(plot.nodes, hasLength(1));
+      expect(plot.timeMarks, hasLength(1));
+      expect(
+        plot.timeMarks.single.x,
+        closeTo(plot.nodes.single.position.dx, 0.5),
+      );
+      expect(
+        plot.size.width,
+        closeTo(
+          plot.nodes.single.position.dx +
+              ReconstructionCanvasLayout.markSize / 2 +
+              ReconstructionCanvasLayout.rightPad,
+          0.5,
+        ),
+      );
+      expect(plot.size.height, ReconstructionCanvasLayout.defaultViewport.height);
+    });
+
+    test('CASE B: hours-apart evidence keep equal ordinal X gaps', () {
+      final t0 = DateTime.utc(2026, 8, 28, 10, 0);
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(id: 'a', capturedAt: t0, latitude: 27.1, longitude: 85.3),
+          _item(
+            id: 'b',
+            capturedAt: t0.add(const Duration(hours: 8)),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+        ],
+      );
+      final gap = plot.nodeById('b')!.position.dx - plot.nodeById('a')!.position.dx;
+      expect(gap, greaterThan(30));
+      expect(
+        plot.timeMarks[1].x - plot.timeMarks[0].x,
+        closeTo(gap, 0.5),
+      );
+      expect(
+        plot.size.width,
+        closeTo(
+          plot.nodeById('b')!.position.dx +
+              ReconstructionCanvasLayout.markSize / 2 +
+              ReconstructionCanvasLayout.rightPad,
+          0.5,
+        ),
+      );
+    });
+
+    test('CASE C: close-together evidence keep finger-width X separation', () {
+      final t0 = DateTime.utc(2026, 8, 28, 10, 0);
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(id: 'a', capturedAt: t0, latitude: 27.1, longitude: 85.3),
+          _item(
+            id: 'b',
+            capturedAt: t0.add(const Duration(seconds: 1)),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+          _item(
+            id: 'c',
+            capturedAt: t0.add(const Duration(seconds: 2)),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+        ],
+      );
+      final ab = plot.nodeById('b')!.position.dx - plot.nodeById('a')!.position.dx;
+      final bc = plot.nodeById('c')!.position.dx - plot.nodeById('b')!.position.dx;
+      expect(ab, greaterThan(30));
+      expect((ab - bc).abs(), lessThan(8));
+      final markXs = [for (final mark in plot.timeMarks) mark.x]..sort();
+      for (var i = 1; i < markXs.length; i++) {
+        expect(markXs[i] - markXs[i - 1], greaterThan(30));
+      }
+    });
+
+    test(
+      'CASE D: burst then later item keeps ordinal gaps and a finite canvas',
+      () {
+        const viewport = Size(412, 915);
+        final plot = ReconstructionCanvasLayout.fromEvidence(
+          evidence: [
+            _item(
+              id: 'a',
+              capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 0),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+            _item(
+              id: 'b',
+              capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 1),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+            _item(
+              id: 'c',
+              capturedAt: DateTime.utc(2026, 8, 28, 18, 0, 0),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+          ],
+          viewport: viewport,
+        );
+        final ab =
+            plot.nodeById('b')!.position.dx - plot.nodeById('a')!.position.dx;
+        final bc =
+            plot.nodeById('c')!.position.dx - plot.nodeById('b')!.position.dx;
+        expect(ab, greaterThan(30));
+        expect(bc, greaterThan(30));
+        expect((ab - bc).abs(), lessThan(8));
+        expect(plot.size.width, lessThan(viewport.width * 3));
+        expect(plot.size.height, viewport.height);
+      },
+    );
+
+    test('one evidence still has width for the mark and trailing margin', () {
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(
+            id: 'photo',
+            capturedAt: DateTime.utc(2026, 8, 28, 7, 15, 30),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+        ],
+      );
+      expect(plot.nodes, hasLength(1));
+      expect(
+        plot.size.width,
+        greaterThan(
+          plot.nodes.single.position.dx + ReconstructionCanvasLayout.markSize / 2,
+        ),
+      );
+      expect(
+        plot.size.width -
+            (plot.nodes.single.position.dx +
+                ReconstructionCanvasLayout.markSize / 2),
+        closeTo(ReconstructionCanvasLayout.rightPad, 0.5),
+      );
+    });
+
+    test(
+      'multiple evidence bound the canvas by the rightmost laid-out position',
+      () {
+        final plot = ReconstructionCanvasLayout.fromEvidence(
+          evidence: [
+            _item(
+              id: 'a',
+              capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 0),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+            _item(
+              id: 'b',
+              capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 1),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+            _item(
+              id: 'c',
+              capturedAt: DateTime.utc(2026, 8, 28, 18, 0, 0),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+          ],
+        );
+        var rightmost = plot.origin.dx;
+        for (final node in plot.nodes) {
+          if (node.position.dx > rightmost) {
+            rightmost = node.position.dx;
+          }
+        }
+        expect(
+          plot.size.width,
+          closeTo(
+            rightmost +
+                ReconstructionCanvasLayout.markSize / 2 +
+                ReconstructionCanvasLayout.rightPad,
+            0.5,
+          ),
+        );
+      },
+    );
+
+    test(
+      'close timestamps do not explode the InteractiveViewer child width',
+      () {
+        const viewport = Size(412, 915);
+        final plot = ReconstructionCanvasLayout.fromEvidence(
+          evidence: [
+            _item(
+              id: 'a',
+              capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 0),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+            _item(
+              id: 'b',
+              capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 1),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+            _item(
+              id: 'c',
+              capturedAt: DateTime.utc(2026, 8, 28, 18, 0, 0),
+              latitude: 27.1,
+              longitude: 85.3,
+            ),
+          ],
+          viewport: viewport,
+        );
+        var rightmost = plot.origin.dx;
+        for (final node in plot.nodes) {
+          if (node.position.dx > rightmost) {
+            rightmost = node.position.dx;
+          }
+        }
+        expect(plot.size.width.isFinite, isTrue);
+        expect(
+          plot.size.width,
+          closeTo(
+            rightmost +
+                ReconstructionCanvasLayout.markSize / 2 +
+                ReconstructionCanvasLayout.rightPad,
+            0.5,
+          ),
+        );
+        expect(plot.size.width, lessThan(viewport.width * 3));
+        expect(
+          plot.nodeById('b')!.position.dx - plot.nodeById('a')!.position.dx,
+          greaterThan(30),
+        );
+        expect(
+          plot.nodeById('c')!.position.dx - plot.nodeById('b')!.position.dx,
+          greaterThan(30),
+        );
+        final markXs = [for (final mark in plot.timeMarks) mark.x]..sort();
+        for (var i = 1; i < markXs.length; i++) {
+          expect(markXs[i] - markXs[i - 1], greaterThan(30));
+        }
+      },
+    );
+
+    test('later evidence expands the canvas to include it', () {
+      final first = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(
+            id: 'a',
+            capturedAt: DateTime.utc(2026, 8, 28, 10, 0),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+        ],
+      );
+      final later = ReconstructionCanvasLayout.fromEvidence(
+        evidence: [
+          _item(
+            id: 'a',
+            capturedAt: DateTime.utc(2026, 8, 28, 10, 0),
+            latitude: 27.1,
+            longitude: 85.3,
+          ),
+          _item(
+            id: 'b',
+            capturedAt: DateTime.utc(2026, 8, 28, 12, 0),
+            latitude: 27.2,
+            longitude: 85.4,
+          ),
+        ],
+      );
+      expect(later.size.width, greaterThan(first.size.width));
+      final rightmost = later.nodeById('b')!.position.dx;
+      expect(
+        later.size.width,
+        closeTo(
+          rightmost +
+              ReconstructionCanvasLayout.markSize / 2 +
+              ReconstructionCanvasLayout.rightPad,
+          0.5,
+        ),
+      );
+    });
+
+    test('empty evidence keeps the compact empty canvas', () {
+      const viewport = Size(390, 844);
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: const [],
+        viewport: viewport,
+      );
+      expect(plot.nodes, isEmpty);
+      expect(plot.size.width, viewport.width);
+      expect(plot.size.width.isFinite, isTrue);
     });
 
     test('nodes stay clear of both axes, including attachments', () {

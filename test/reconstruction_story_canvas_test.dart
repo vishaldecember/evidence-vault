@@ -10,6 +10,7 @@ import 'package:evidence_vault/utils/evidence_formatters.dart';
 import 'package:evidence_vault/widgets/investigation/gps_coordinate_title_box.dart';
 import 'package:evidence_vault/widgets/investigation/reconstruction_workspace.dart';
 import 'package:evidence_vault/widgets/reconstruction/narrative/narrative_event_card.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -322,6 +323,167 @@ void main() {
       await tester.tap(find.byKey(ReconstructionWorkspace.nodeKey('photo')));
       await tester.pumpAndSettle();
       expect(tapped?.id, 'photo');
+    },
+  );
+
+  testWidgets(
+    'double-tap a sole connected context opens it without changing anchors',
+    (tester) async {
+      WorkspaceEvidenceItem? tapped;
+      const anchors = [
+        OrganizeContextAnchor(
+          contextEvidenceId: 'note',
+          capturedEvidenceId: 'photo',
+        ),
+      ];
+      await pumpCanvas(
+        tester,
+        evidence: [
+          _item(
+            id: 'photo',
+            capturedAt: DateTime.utc(2026, 8, 28, 4, 42),
+            latitude: 27.7172,
+            longitude: 85.3240,
+          ),
+          _item(
+            id: 'note',
+            kind: WorkspaceEvidenceKind.note,
+            capturedAt: DateTime.utc(2026, 8, 28, 9, 0),
+          ),
+        ],
+        organizeCreatedIds: const {'note'},
+        anchors: anchors,
+        onTap: (item) => tapped = item,
+      );
+
+      await tester.tap(find.byKey(ReconstructionWorkspace.nodeKey('note')));
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.tap(find.byKey(ReconstructionWorkspace.nodeKey('note')));
+      await tester.pump();
+      await tester.pump(kDoubleTapTimeout);
+
+      expect(tapped?.id, 'note');
+      expect(anchors, hasLength(1));
+      expect(anchors.single.contextEvidenceId, 'note');
+      expect(anchors.single.capturedEvidenceId, 'photo');
+    },
+  );
+
+  testWidgets(
+    'canvas width stops after the last evidence plus trailing margin',
+    (tester) async {
+      final evidence = [
+        _item(
+          id: 'early',
+          capturedAt: DateTime.utc(2026, 8, 28, 4, 42),
+          latitude: 27.7172,
+          longitude: 85.3240,
+        ),
+        _item(
+          id: 'late',
+          capturedAt: DateTime.utc(2026, 8, 28, 18, 10),
+          latitude: 27.7172,
+          longitude: 85.3240,
+        ),
+      ];
+      await pumpCanvas(tester, evidence: evidence);
+
+      final plot = ReconstructionCanvasLayout.fromEvidence(
+        evidence: evidence,
+        viewport: const Size(412, 915),
+      );
+      var rightmost = plot.origin.dx;
+      for (final node in plot.nodes) {
+        if (node.position.dx > rightmost) {
+          rightmost = node.position.dx;
+        }
+      }
+      final canvas = tester.renderObject<RenderBox>(
+        find.byKey(ReconstructionStoryCanvas.canvasKey),
+      );
+      expect(
+        canvas.size.width,
+        closeTo(
+          rightmost +
+              ReconstructionCanvasLayout.markSize / 2 +
+              ReconstructionCanvasLayout.rightPad,
+          1,
+        ),
+      );
+      expect(canvas.size.width, closeTo(plot.size.width, 0.5));
+      expect(canvas.size.width.isFinite, isTrue);
+    },
+  );
+
+  testWidgets(
+    'CASE D: 8000px right drag cannot cross empty space; left and vertical stay locked',
+    (tester) async {
+      await pumpCanvas(
+        tester,
+        evidence: [
+          _item(
+            id: 'a',
+            capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 0),
+            latitude: 27.7172,
+            longitude: 85.3240,
+          ),
+          _item(
+            id: 'b',
+            capturedAt: DateTime.utc(2026, 8, 28, 10, 0, 1),
+            latitude: 27.7172,
+            longitude: 85.3240,
+          ),
+          _item(
+            id: 'c',
+            capturedAt: DateTime.utc(2026, 8, 28, 18, 0, 0),
+            latitude: 27.7172,
+            longitude: 85.3240,
+          ),
+        ],
+      );
+
+      final viewer = find.byType(InteractiveViewer);
+      final canvas = tester.getSize(
+        find.byKey(ReconstructionStoryCanvas.canvasKey),
+      );
+      final viewport = tester.getSize(viewer);
+      expect(canvas.width.isFinite, isTrue);
+      expect(canvas.width, lessThan(viewport.width * 3));
+
+      Offset translation() {
+        final transform = tester.widget<Transform>(
+          find.descendant(
+            of: viewer,
+            matching: find.byType(Transform),
+          ),
+        );
+        final t = transform.transform.getTranslation();
+        return Offset(t.x, t.y);
+      }
+
+      await tester.timedDrag(
+        viewer,
+        const Offset(-8000, 0),
+        const Duration(milliseconds: 500),
+      );
+      await tester.pumpAndSettle();
+      expect(translation().dx.abs(), lessThan(viewport.width));
+
+      await tester.timedDrag(
+        viewer,
+        const Offset(8000, 0),
+        const Duration(milliseconds: 500),
+      );
+      await tester.pumpAndSettle();
+      expect(translation().dx.abs(), lessThanOrEqualTo(48));
+
+      await tester.timedDrag(
+        viewer,
+        const Offset(0, -8000),
+        const Duration(milliseconds: 500),
+      );
+      await tester.pumpAndSettle();
+      expect(translation().dy.abs(), lessThanOrEqualTo(48));
     },
   );
 

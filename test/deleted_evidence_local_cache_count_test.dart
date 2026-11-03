@@ -349,9 +349,11 @@ void main() {
         'lib/services/persistence/incident_library_service.dart',
       ).readAsStringSync();
       expect(
-        source.contains('math.max(existing.evidenceCount, localCount)'),
+        source.contains('math.max(existing.evidenceCount, localEvidence)'),
         isTrue,
       );
     });
   });
 }
+
+

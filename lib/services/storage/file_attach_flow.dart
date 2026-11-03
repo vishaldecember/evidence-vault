@@ -287,6 +287,7 @@ abstract final class FileAttachFlow {
         persistMode: persistMode,
         mimeType: mime,
         lockedIncidentId: sourceIncidentId,
+        asOrganizeContext: asOrganizeContext,
       );
 
       if (!preserved) {
@@ -646,6 +647,7 @@ abstract final class FileAttachFlow {
     WorkspaceCaptureMode persistMode = WorkspaceCaptureMode.file,
     String? mimeType,
     String? lockedIncidentId,
+    bool asOrganizeContext = false,
   }) async {
     final controller = WorkspaceSession.instance.controller;
     final incidentId = controller.currentIncident.id;
@@ -681,6 +683,7 @@ abstract final class FileAttachFlow {
           media: media,
           persistMode: persistMode,
           mimeType: mimeType,
+          asOrganizeContext: asOrganizeContext,
         );
         switch (dialogResult) {
           case FilePersistDialogResult.success:
@@ -707,6 +710,7 @@ abstract final class FileAttachFlow {
         media: media,
         mimeType: mimeType,
         uploadCoordinator: EvidenceUploadCoordinator.instance,
+        asOrganizeContext: asOrganizeContext,
       );
       return _verifyIncidentBinding(expected ?? incidentId);
     } catch (error, stack) {

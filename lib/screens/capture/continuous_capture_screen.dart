@@ -133,6 +133,7 @@ class _ContinuousCaptureScreenState extends State<ContinuousCaptureScreen> {
   final ScrollController _timelineScroll = ScrollController();
   int _lastTimelineLength = 0;
   late final String _boundIncidentId;
+  late final bool _startTitleEditing;
 
   WorkspaceEvidenceController get _controller =>
       widget.controller ?? WorkspaceSession.instance.controller;
@@ -152,6 +153,7 @@ class _ContinuousCaptureScreenState extends State<ContinuousCaptureScreen> {
   void initState() {
     super.initState();
     _boundIncidentId = _controller.currentIncident.id;
+    _startTitleEditing = WorkspaceSession.instance.consumeTitleEditRequest();
     FileAttachFlow.workspaceRouteVisible = true;
     FileP0Trace.step(
       'WORKSPACE_INIT',
@@ -586,6 +588,7 @@ class _ContinuousCaptureScreenState extends State<ContinuousCaptureScreen> {
                                   : '',
                               enabled: _canCapture,
                               showPreservingLabel: false,
+                              startEditing: _startTitleEditing,
                               onTitleSaved: _saveTitle,
                             ),
                             CaptureStickyBar(

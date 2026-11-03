@@ -1,3 +1,5 @@
+import 'journey_stage.dart';
+
 /// Summary of an incident in the Library of Truth.
 class LibraryIncidentSummary {
   const LibraryIncidentSummary({
@@ -15,6 +17,7 @@ class LibraryIncidentSummary {
     this.coverEvidenceId,
     this.createdAt,
     this.updatedAt,
+    this.journeyStage = JourneyStage.empty,
   });
 
   final String id;
@@ -42,6 +45,9 @@ class LibraryIncidentSummary {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  /// Enrichment maturity used by Library status / richness.
+  final JourneyStage journeyStage;
+
   LibraryIncidentSummary copyWith({
     String? id,
     String? title,
@@ -58,6 +64,7 @@ class LibraryIncidentSummary {
     String? coverEvidenceId,
     DateTime? createdAt,
     DateTime? updatedAt,
+    JourneyStage? journeyStage,
   }) {
     return LibraryIncidentSummary(
       id: id ?? this.id,
@@ -74,6 +81,7 @@ class LibraryIncidentSummary {
       coverEvidenceId: coverEvidenceId ?? this.coverEvidenceId,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      journeyStage: journeyStage ?? this.journeyStage,
     );
   }
 }

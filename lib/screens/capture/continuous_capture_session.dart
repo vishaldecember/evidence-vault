@@ -195,7 +195,10 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
   final List<double> _waveLevels = List<double>.filled(28, 0.12);
   StreamSubscription<Amplitude>? _ampSub;
   AudioPlayer? _voicePlayer;
+  StreamSubscription<void>? _voiceCompleteSub;
+  StreamSubscription<Duration>? _voicePositionSub;
   bool _voicePreviewPlaying = false;
+  Duration _voicePreviewPosition = Duration.zero;
 
   bool get _hasPendingCompletedCapture =>
       (_photoPhase == _PhotoPhase.preview && _photoPreviewPath != null) ||
@@ -397,6 +400,10 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     _pointers = 0;
     await _ampSub?.cancel();
     _ampSub = null;
+    await _voiceCompleteSub?.cancel();
+    _voiceCompleteSub = null;
+    await _voicePositionSub?.cancel();
+    _voicePositionSub = null;
     final player = _voicePlayer;
     _voicePlayer = null;
     await player?.dispose();
@@ -1112,6 +1119,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
       _voicePhase = _VoicePhase.ready;
       _voiceElapsed = Duration.zero;
       _voicePreviewPlaying = false;
+      _voicePreviewPosition = Duration.zero;
     });
   }
 
@@ -1130,6 +1138,7 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
       _voicePhase = _VoicePhase.ready;
       _voiceElapsed = Duration.zero;
       _voicePreviewPlaying = false;
+      _voicePreviewPosition = Duration.zero;
     });
     if (!_isFlutterTest) await _deleteIfExists(path);
   }
@@ -1138,11 +1147,27 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     try {
       await _voicePlayer?.stop();
     } catch (_) {}
+    _voicePreviewPosition = Duration.zero;
     if (mounted) {
       setState(() => _voicePreviewPlaying = false);
     } else {
       _voicePreviewPlaying = false;
     }
+  }
+
+  Future<void> _ensureVoicePlayer() async {
+    _voicePlayer ??= AudioPlayer();
+    _voiceCompleteSub ??= _voicePlayer!.onPlayerComplete.listen((_) {
+      if (!mounted) return;
+      setState(() {
+        _voicePreviewPlaying = false;
+        _voicePreviewPosition = Duration.zero;
+      });
+    });
+    _voicePositionSub ??= _voicePlayer!.onPositionChanged.listen((position) {
+      if (!mounted) return;
+      setState(() => _voicePreviewPosition = position);
+    });
   }
 
   Future<void> _toggleVoicePreviewPlayback() async {
@@ -1152,17 +1177,33 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
     }
     final path = _voicePreviewPath;
     if (path == null) return;
-    _voicePlayer ??= AudioPlayer();
-    if (_voicePreviewPlaying) {
-      await _voicePlayer!.pause();
-      setState(() => _voicePreviewPlaying = false);
-      return;
+    try {
+      final file = File(path);
+      if (!await file.exists() || await file.length() == 0) {
+        if (mounted) {
+          setState(() => _voicePreviewPlaying = false);
+        }
+        return;
+      }
+      await _ensureVoicePlayer();
+      if (_voicePreviewPlaying) {
+        await _voicePlayer!.pause();
+        if (mounted) setState(() => _voicePreviewPlaying = false);
+        return;
+      }
+      if (_voicePlayer!.state == PlayerState.paused) {
+        await _voicePlayer!.resume();
+      } else {
+        await _voicePlayer!.stop();
+        await _voicePlayer!.play(DeviceFileSource(path));
+      }
+      if (mounted) setState(() => _voicePreviewPlaying = true);
+    } catch (error) {
+      debugPrint('[Voice] preview playback failed: $error');
+      if (mounted) {
+        setState(() => _voicePreviewPlaying = false);
+      }
     }
-    await _voicePlayer!.play(DeviceFileSource(path));
-    setState(() => _voicePreviewPlaying = true);
-    _voicePlayer!.onPlayerComplete.listen((_) {
-      if (mounted) setState(() => _voicePreviewPlaying = false);
-    });
   }
 
   String _formatDuration(Duration d) {
@@ -1347,7 +1388,13 @@ class _ContinuousCaptureSessionState extends State<ContinuousCaptureSession> {
             child: VoicePreviewPanel(
               levels: _waveLevels,
               durationLabel: _formatDuration(_voiceElapsed),
+              positionLabel: _formatDuration(_voicePreviewPosition),
               isPlaying: _voicePreviewPlaying,
+              progress: _voiceElapsed.inMilliseconds == 0
+                  ? 0.0
+                  : (_voicePreviewPosition.inMilliseconds /
+                            _voiceElapsed.inMilliseconds)
+                        .clamp(0.0, 1.0),
               onPlayPause: () => unawaited(_toggleVoicePreviewPlayback()),
               onAccept: () => unawaited(_acceptVoice()),
               onDiscard: () => unawaited(_discardVoice()),

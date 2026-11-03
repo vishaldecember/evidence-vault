@@ -50,6 +50,7 @@ class HomeIncidentDisplayState {
     required String sessionTitle,
     required int sessionEvidenceCount,
     required int sessionNarrativeCount,
+    int? sessionContextEnrichedCount,
   }) {
     final valid = [
       for (final incident in libraryIncidents)
@@ -74,6 +75,7 @@ class HomeIncidentDisplayState {
             sessionTitle: sessionTitle,
             sessionEvidenceCount: sessionEvidenceCount,
             sessionNarrativeCount: sessionNarrativeCount,
+            sessionContextEnrichedCount: sessionContextEnrichedCount,
           );
           break;
         }
@@ -101,6 +103,7 @@ class HomeIncidentDisplayState {
     required String sessionTitle,
     required int sessionEvidenceCount,
     required int sessionNarrativeCount,
+    int? sessionContextEnrichedCount,
   }) {
     return LibraryIncidentSummary(
       id: library.id,
@@ -108,7 +111,8 @@ class HomeIncidentDisplayState {
       evidenceCount: sessionEvidenceCount > 0
           ? sessionEvidenceCount
           : library.evidenceCount,
-      contextEnrichedCount: library.contextEnrichedCount,
+      contextEnrichedCount:
+          sessionContextEnrichedCount ?? library.contextEnrichedCount,
       integrityVerified: library.integrityVerified,
       lastPreserved: library.lastPreserved,
       narrativeCount: sessionNarrativeCount,
@@ -118,6 +122,7 @@ class HomeIncidentDisplayState {
       deletedAt: library.deletedAt,
       createdAt: library.createdAt,
       updatedAt: library.updatedAt,
+      journeyStage: library.journeyStage,
     );
   }
 

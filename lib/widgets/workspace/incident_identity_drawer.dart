@@ -76,6 +76,11 @@ class _IncidentIdentityDrawerState extends State<IncidentIdentityDrawer>
 
     if (widget.isExpanded) {
       _expandController.value = 1;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.isExpanded) {
+          _activateField();
+        }
+      });
     }
 
     if (widget.animateEntry) {
@@ -108,6 +113,13 @@ class _IncidentIdentityDrawerState extends State<IncidentIdentityDrawer>
     }
     if (!oldWidget.isExpanded && widget.isExpanded && _nameController.text.isEmpty) {
       _showPlaceholder = true;
+    }
+    if (!oldWidget.isExpanded && widget.isExpanded) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.isExpanded) {
+          _activateField();
+        }
+      });
     }
   }
 

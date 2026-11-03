@@ -31,12 +31,14 @@ abstract final class LocalEvidenceCache {
   /// In-memory mirror of the durable metadata index.
   static final Map<String, CachedEvidenceEntry> _index = {};
   static bool _indexLoaded = false;
+  static bool _indexLoadFailed = false;
 
   /// Test hook — clears in-memory + root override.
   @visibleForTesting
   static void resetForTests() {
     _index.clear();
     _indexLoaded = false;
+    _indexLoadFailed = false;
     _root = null;
   }
 
@@ -59,37 +61,66 @@ abstract final class LocalEvidenceCache {
   }
 
   static Future<void> _ensureIndexLoaded() async {
-    if (_indexLoaded || kIsWeb) {
+    if (_indexLoaded) {
+      if (_indexLoadFailed) {
+        throw StateError(
+          'Evidence metadata index is corrupt or unreadable; mutations are blocked.',
+        );
+      }
+      return;
+    }
+
+    if (kIsWeb) {
       _indexLoaded = true;
       return;
     }
+
     try {
       final file = await _indexFile();
       if (await file.exists()) {
         final decoded = jsonDecode(await file.readAsString());
+        if (decoded is! List) {
+          throw const FormatException(
+            'Evidence metadata index root must be a JSON list.',
+          );
+        }
+
         _index.clear();
-        if (decoded is List) {
-          for (final raw in decoded) {
-            if (raw is Map<String, dynamic>) {
-              final entry = CachedEvidenceEntry.fromJson(raw);
-              if (entry.evidenceId.isNotEmpty) {
-                _index[entry.evidenceId] = entry;
-              }
-            } else if (raw is Map) {
-              final entry = CachedEvidenceEntry.fromJson(
-                Map<String, dynamic>.from(raw),
-              );
-              if (entry.evidenceId.isNotEmpty) {
-                _index[entry.evidenceId] = entry;
-              }
+        for (final raw in decoded) {
+          if (raw is Map<String, dynamic>) {
+            final entry = CachedEvidenceEntry.fromJson(raw);
+            if (entry.evidenceId.isNotEmpty) {
+              _index[entry.evidenceId] = entry;
             }
+          } else if (raw is Map) {
+            final entry = CachedEvidenceEntry.fromJson(
+              Map<String, dynamic>.from(raw),
+            );
+            if (entry.evidenceId.isNotEmpty) {
+              _index[entry.evidenceId] = entry;
+            }
+          } else {
+            throw const FormatException(
+              'Evidence metadata index contains a non-object record.',
+            );
           }
         }
       }
+
+      _indexLoaded = true;
     } catch (error) {
-      debugPrint('[LocalEvidenceCache] index load failed: $error');
+      _index.clear();
+      _indexLoadFailed = true;
+      _indexLoaded = true;
+      debugPrint(
+        '[LocalEvidenceCache] index load failed; writes blocked: $error',
+      );
+      throw StateError(
+        'Evidence metadata index is corrupt or unreadable. '
+        'Original index preserved; writes and deletions are blocked. '
+        'Cause: $error',
+      );
     }
-    _indexLoaded = true;
   }
 
   static Future<void> _persistIndex() async {
@@ -98,9 +129,7 @@ abstract final class LocalEvidenceCache {
     }
     try {
       final file = await _indexFile();
-      final payload = [
-        for (final entry in _index.values) entry.toJson(),
-      ];
+      final payload = [for (final entry in _index.values) entry.toJson()];
       await file.writeAsString(jsonEncode(payload));
     } catch (error) {
       debugPrint('[LocalEvidenceCache] index save failed: $error');
@@ -128,21 +157,18 @@ abstract final class LocalEvidenceCache {
     String? userId,
   }) async {
     await _ensureIndexLoaded();
-    final list = _index.values
-        .where((entry) {
-          if (entry.incidentId != incidentId) {
-            return false;
-          }
-          if (userId == null || userId.isEmpty) {
-            return true;
-          }
-          if (entry.userId.isEmpty) {
-            return true;
-          }
-          return entry.userId == userId;
-        })
-        .toList()
-      ..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
+    final list = _index.values.where((entry) {
+      if (entry.incidentId != incidentId) {
+        return false;
+      }
+      if (userId == null || userId.isEmpty) {
+        return true;
+      }
+      if (entry.userId.isEmpty) {
+        return true;
+      }
+      return entry.userId == userId;
+    }).toList()..sort((a, b) => a.capturedAt.compareTo(b.capturedAt));
     return list;
   }
 
@@ -328,8 +354,10 @@ abstract final class LocalEvidenceCache {
         final thumbSource = File(media.thumbnailPath!);
         if (await thumbSource.exists()) {
           final thumbExt = p.extension(media.thumbnailPath!);
-          durableThumb =
-              p.join(incidentDir.path, '${evidenceId}_thumb$thumbExt');
+          durableThumb = p.join(
+            incidentDir.path,
+            '${evidenceId}_thumb$thumbExt',
+          );
           if (p.normalize(thumbSource.path) != p.normalize(durableThumb)) {
             final thumbBytes = await thumbSource.length();
             await _copyFileOffUiIfLarge(
@@ -347,9 +375,7 @@ abstract final class LocalEvidenceCache {
 
       final durableFile = File(durablePath);
       if (!await durableFile.exists()) {
-        throw MediaDurabilityException(
-          'Durable media copy was not written.',
-        );
+        throw MediaDurabilityException('Durable media copy was not written.');
       }
 
       final out = CapturedMediaFile(

@@ -18,12 +18,14 @@ import 'persistence/incident_library_service.dart';
 import 'persistence/local_capture_session_store.dart';
 import 'persistence/local_incident_pointer.dart';
 import 'persistence/organize_context_persistence.dart';
+import 'persistence/vault_wipe_pending.dart';
 import 'storage/durable_attach_intent_store.dart';
 import 'storage/evidence_storage_service.dart' as firebase_object_storage;
 import 'storage/local_evidence_cache.dart';
 import 'storage/saf_staging_bridge.dart';
 import 'sync/evidence_sync_manager.dart';
 import 'user_session_service.dart';
+import 'persistence/incident_cloud_sync_service.dart';
 
 /// Snapshot for transactional rollback during investigation data deletion.
 class InvestigationDataDeletionSnapshot {
@@ -91,6 +93,8 @@ class InvestigationDataDeletionService {
 
   Future<void> deleteAllInvestigationData() async {
     final snapshot = InvestigationDataDeletionSnapshot.capture();
+    final sync = IncidentCloudSyncService.instance;
+    sync.beginDestructiveWipe();
     try {
       final store = WorkspaceSession.instance.controller.aggregate.store;
       _deleteTrustPackages();
@@ -98,14 +102,17 @@ class InvestigationDataDeletionService {
       _deleteTimelineAnchors(store);
       _deleteNarrativeEvents(store);
       _deleteEvidence(store);
+      await _recordPendingCloudWipe();
+      await (removeCloudBackups ?? _defaultRemoveCloudBackups)();
       await _deleteIncidentsAndLocalIdentity();
       IncidentLibraryService.instance.clear();
       await (removeSearchIndexes ?? _defaultRemoveSearchIndexes)();
       await (deletePersistedMedia ?? _defaultDeletePersistedMedia)();
-      await (removeCloudBackups ?? _defaultRemoveCloudBackups)();
     } catch (error) {
       snapshot.restore();
       rethrow;
+    } finally {
+      sync.endDestructiveWipe();
     }
   }
 
@@ -160,6 +167,19 @@ class InvestigationDataDeletionService {
     await EvidenceStorageService.clearTrustPackageExports();
   }
 
+  static Future<void> _recordPendingCloudWipe() async {
+    final userId = UserSessionService.account?.userId ?? '';
+    if (userId.isEmpty || !FirebaseBootstrap.isAvailable) {
+      return;
+    }
+    try {
+      final ids = await FirebaseIncidentRepository().listIncidentIds(userId);
+      await VaultWipePending.mark(userId: userId, incidentIds: ids);
+    } catch (error) {
+      debugPrint('[Vault] pending wipe mark skipped: $error');
+    }
+  }
+
   static Future<void> _defaultRemoveCloudBackups() async {
     final userId = UserSessionService.account?.userId ?? '';
     if (userId.isEmpty || !FirebaseBootstrap.isAvailable) {
@@ -168,6 +188,7 @@ class InvestigationDataDeletionService {
     try {
       final repo = FirebaseIncidentRepository();
       final incidentIds = await repo.listIncidentIds(userId);
+      await VaultWipePending.mark(userId: userId, incidentIds: incidentIds);
       final storage = firebase_object_storage.EvidenceStorageService();
       for (final incidentId in incidentIds) {
         try {
@@ -180,8 +201,10 @@ class InvestigationDataDeletionService {
         }
       }
       await repo.deleteAllIncidentsForUser(userId);
+      await VaultWipePending.clear();
     } catch (error) {
-      // Non-fatal — local identity is already cleared; cloud retry later.
+      // Local identity still proceeds; pending ids keep Library empty until
+      // a later refresh finishes the cloud delete.
       debugPrint('[Vault] cloud incident wipe failed: $error');
     }
   }

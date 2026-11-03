@@ -31,7 +31,8 @@ class InspectorAtmosphereBackground extends StatelessWidget {
 class InspectorAtmospherePainter extends CustomPainter {
   const InspectorAtmospherePainter();
 
-  static const Color field = Color(0xFF3F4B5E);
+  /// Space Grey field at ~0.92 alpha so the route frost shows through slightly.
+  static const Color field = Color(0xEB3F4B5E);
 
   @override
   void paint(Canvas canvas, Size size) {

@@ -107,8 +107,18 @@ class _VoicePreviewSurfaceState extends State<_VoicePreviewSurface> {
         await _player.pause();
         setState(() => _playing = false);
       } else if (path != null) {
-        await _player.play(DeviceFileSource(path));
-        setState(() => _playing = true);
+        try {
+          if (_player.state == PlayerState.paused) {
+            await _player.resume();
+          } else {
+            await _player.play(DeviceFileSource(path));
+          }
+          setState(() => _playing = true);
+        } catch (_) {
+          if (mounted) {
+            setState(() => _playing = false);
+          }
+        }
       }
       return;
     }

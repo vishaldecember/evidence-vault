@@ -283,7 +283,10 @@ class WorkspaceEvidenceController extends ChangeNotifier
       );
 
   int get timelineAnchorCount =>
-      _aggregate.timelineRepository.orderedCapturedEvidenceIds().length;
+    _aggregate.timelineRepository.orderedCapturedEvidenceIds()
+        .where((id) => _aggregate.store.capturedEvidence
+            .any((evidence) => evidence.id == id))
+        .length;
 
   int get supportingEvidenceCount =>
       _aggregate.evidenceRepository.supportingEvidence.length;
@@ -861,6 +864,7 @@ class WorkspaceEvidenceController extends ChangeNotifier
               fileName: fileName,
               mimeType: mimeType,
               captureSessionId: captureSessionId,
+              createTimelineAnchor: !asOrganizeContext,
             );
     return supporting.id;
   }
@@ -2067,4 +2071,6 @@ class WorkspaceEvidenceController extends ChangeNotifier
     } catch (_) {}
   }
 }
+
+
 

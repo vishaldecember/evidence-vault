@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
+import '../../controllers/workspace_session.dart';
 import '../../domain/incident/incident_deletion_lifecycle.dart';
 import '../../domain/incident/incident_title.dart';
+import '../../models/journey_stage.dart';
 import '../../models/library_incident_summary.dart';
 import '../../theme/app_decorations.dart';
 import '../../theme/app_colors.dart';
@@ -45,13 +47,11 @@ class LibraryIncidentSummaryTile extends StatelessWidget {
     if (incident.isArchived) {
       return IncidentStatus.archived;
     }
-    if (incident.isInProgress) {
-      return IncidentStatus.building;
+    var stage = incident.journeyStage;
+    if (stage == JourneyStage.empty && incident.evidenceCount > 0) {
+      stage = JourneyStage.building;
     }
-    if (incident.integrityVerified) {
-      return IncidentStatus.ready;
-    }
-    return IncidentStatus.incomplete;
+    return IncidentStatus.resolve(journeyStage: stage);
   }
 
   Future<bool> _confirmArchive(BuildContext context) async {
@@ -60,6 +60,7 @@ class LibraryIncidentSummaryTile extends StatelessWidget {
     }
     final addTitle = await showArchiveTitleRequiredDialog(context);
     if (addTitle && context.mounted) {
+      WorkspaceSession.instance.requestTitleEdit = true;
       onTap?.call();
     }
     return false;

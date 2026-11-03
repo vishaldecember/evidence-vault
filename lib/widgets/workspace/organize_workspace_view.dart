@@ -193,7 +193,6 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
   final List<String> _groupDraftIds = [];
   bool _groupDropArmed = false;
   final Set<String> _wobblingCloneIds = {};
-  Set<String> _appendedWobblingIds = const {};
   late final TextEditingController _groupNameController;
   String _groupBaselineName = '';
   List<String> _groupBaselineIds = const [];
@@ -253,13 +252,6 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
   }
 
   List<WorkspaceEvidenceItem> get _floatingContexts => _unsnappedContexts;
-
-  static bool _sameIds(Set<String> left, Set<String> right) {
-    if (left.length != right.length) {
-      return false;
-    }
-    return left.containsAll(right);
-  }
 
   List<WorkspaceEvidenceItem> _contextsForCaptured(String capturedId) {
     final ids = {
@@ -661,14 +653,6 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
                             onWorkspaceDismiss: _groupComposing
                                 ? _dismissGroupWorkspace
                                 : null,
-                            onWobblingContextIdsChanged: (ids) {
-                              if (_sameIds(_appendedWobblingIds, ids)) {
-                                return;
-                              }
-                              setState(() {
-                                _appendedWobblingIds = ids;
-                              });
-                            },
                           ),
                         ]),
                       ),
@@ -717,7 +701,6 @@ class _OrganizeWorkspaceViewState extends State<OrganizeWorkspaceView> {
                   onAddOrganizeContext: widget.onAddOrganizeContext,
                   wobblingContextIds: {
                     for (final item in _unsnappedContexts) item.id,
-                    ..._appendedWobblingIds,
                   },
                 ),
               ),
@@ -1185,7 +1168,6 @@ class _EvidenceStructureCard extends StatelessWidget {
     this.onGroupCloneDragEnded,
     this.onRemoveGroupClone,
     this.onWorkspaceDismiss,
-    this.onWobblingContextIdsChanged,
   });
 
   final GlobalKey<OrganizeChronologyCanvasState>? canvasKey;
@@ -1208,7 +1190,6 @@ class _EvidenceStructureCard extends StatelessWidget {
   final VoidCallback? onGroupCloneDragEnded;
   final ValueChanged<String>? onRemoveGroupClone;
   final VoidCallback? onWorkspaceDismiss;
-  final ValueChanged<Set<String>>? onWobblingContextIdsChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -1237,7 +1218,6 @@ class _EvidenceStructureCard extends StatelessWidget {
           onGroupCloneDragEnded: onGroupCloneDragEnded,
           onRemoveGroupClone: onRemoveGroupClone,
           onWorkspaceDismiss: onWorkspaceDismiss,
-          onWobblingContextIdsChanged: onWobblingContextIdsChanged,
         ),
       ],
     );

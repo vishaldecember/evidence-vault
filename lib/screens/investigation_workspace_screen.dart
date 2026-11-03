@@ -332,6 +332,7 @@ class InvestigationWorkspaceScreenState
         _controller.currentIncident.evidenceCollections,
         _boundIncidentId,
       ),
+      contextAnchors: _controller.organizeContextAnchors,
       onEvidenceTap: _handleEvidenceSelected,
     );
   }

@@ -152,6 +152,7 @@ class _InvestigationEvidenceInspectorModalState
   late int _activeIndex;
   late final String _boundIncidentIdAtOpen;
   Timer? _persistTimer;
+  final ScrollController _bodyScrollController = ScrollController();
 
   bool get _operationOwnsBound =>
       InvestigateIncidentScope.sessionMatchesBound(
@@ -177,6 +178,7 @@ class _InvestigationEvidenceInspectorModalState
   void dispose() {
     _persistTimer?.cancel();
     _persistTimer = null;
+    _bodyScrollController.dispose();
     super.dispose();
   }
 
@@ -528,40 +530,6 @@ class _InvestigationEvidenceInspectorModalState
           incidentTitle: incidentTitle,
         ),
         const InspectorQuietDivider(),
-        InspectorFactsSection(record: record),
-        const InspectorQuietDivider(),
-        InspectorIntegritySection(evidence: evidence),
-        const InspectorQuietDivider(),
-        InspectorProvenanceSection(evidence: evidence),
-        if (EvidenceInspectorSemantics.isVaultCapturedMedia(evidence)) ...[
-          const InspectorQuietDivider(),
-          const InspectorVerificationSection(),
-        ],
-        const InspectorQuietDivider(),
-        if (_linkedOrganizeMoment(evidence) case final linked?) ...[
-          InspectorLinkedOrganizeMomentSection(linked: linked),
-          const InspectorQuietDivider(),
-        ],
-        InspectorContextSection(
-          key: ValueKey('inspector_context_${record.evidence.id}'),
-          record: record,
-          onDraftChanged: _handleContextDraft,
-          expandEditor: false,
-          requestAutofocus: false,
-          onEditingChanged: _handleContextEditingChanged,
-        ),
-        const InspectorQuietDivider(),
-        InspectorChronologySection(
-          position: _chronologyFor(evidence),
-          priorObservationCaption:
-              OrganizeProactiveRecord.isPriorObservation(
-                item: evidence,
-                incidentEvidence: widget.controller.currentIncident.evidence,
-              )
-                  ? OrganizeProactiveRecord.caption
-                  : null,
-        ),
-        const InspectorQuietDivider(),
         Semantics(
           container: true,
           label:
@@ -619,6 +587,40 @@ class _InvestigationEvidenceInspectorModalState
             ],
           ),
         ),
+        const InspectorQuietDivider(),
+        InspectorFactsSection(record: record),
+        const InspectorQuietDivider(),
+        InspectorIntegritySection(evidence: evidence),
+        const InspectorQuietDivider(),
+        InspectorProvenanceSection(evidence: evidence),
+        if (EvidenceInspectorSemantics.isVaultCapturedMedia(evidence)) ...[
+          const InspectorQuietDivider(),
+          const InspectorVerificationSection(),
+        ],
+        const InspectorQuietDivider(),
+        if (_linkedOrganizeMoment(evidence) case final linked?) ...[
+          InspectorLinkedOrganizeMomentSection(linked: linked),
+          const InspectorQuietDivider(),
+        ],
+        InspectorContextSection(
+          key: ValueKey('inspector_context_${record.evidence.id}'),
+          record: record,
+          onDraftChanged: _handleContextDraft,
+          expandEditor: false,
+          requestAutofocus: false,
+          onEditingChanged: _handleContextEditingChanged,
+        ),
+        const InspectorQuietDivider(),
+        InspectorChronologySection(
+          position: _chronologyFor(evidence),
+          priorObservationCaption:
+              OrganizeProactiveRecord.isPriorObservation(
+                item: evidence,
+                incidentEvidence: widget.controller.currentIncident.evidence,
+              )
+                  ? OrganizeProactiveRecord.caption
+                  : null,
+        ),
       ],
     );
   }
@@ -630,7 +632,7 @@ class _InvestigationEvidenceInspectorModalState
         key: const Key('evidence_inspector_preview_divider'),
         height: 12,
         thickness: 1,
-        color: AppColors.cardHalo.withValues(alpha: 0.55),
+        color: AppColors.onCanvas.withValues(alpha: 0.26),
       ),
     );
   }
@@ -760,19 +762,41 @@ class _InvestigationEvidenceInspectorModalState
                               padding: const EdgeInsets.symmetric(
                                 horizontal: AppSpacing.md,
                               ),
-                              child: SingleChildScrollView(
-                                key: const Key(
-                                  'evidence_inspector_body_scroll',
+                              child: ScrollbarTheme(
+                                data: ScrollbarThemeData(
+                                  thumbColor: WidgetStateProperty.all(
+                                    AppColors.onCanvas.withValues(alpha: 0.32),
+                                  ),
+                                  thickness: WidgetStateProperty.all(3),
+                                  radius: const Radius.circular(2),
+                                  crossAxisMargin: 0,
+                                  mainAxisMargin: 4,
+                                  thumbVisibility: WidgetStateProperty.all(
+                                    true,
+                                  ),
                                 ),
-                                keyboardDismissBehavior:
-                                    ScrollViewKeyboardDismissBehavior.onDrag,
-                                child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.stretch,
-                                  children: [
-                                    _buildRecordBody(record),
-                                    const SizedBox(height: AppSpacing.xs),
-                                  ],
+                                child: Scrollbar(
+                                  controller: _bodyScrollController,
+                                  thumbVisibility: true,
+                                  thickness: 3,
+                                  radius: const Radius.circular(2),
+                                  child: SingleChildScrollView(
+                                    key: const Key(
+                                      'evidence_inspector_body_scroll',
+                                    ),
+                                    controller: _bodyScrollController,
+                                    keyboardDismissBehavior:
+                                        ScrollViewKeyboardDismissBehavior
+                                            .onDrag,
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.stretch,
+                                      children: [
+                                        _buildRecordBody(record),
+                                        const SizedBox(height: AppSpacing.xs),
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
                             ),

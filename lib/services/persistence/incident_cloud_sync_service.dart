@@ -6,6 +6,7 @@ import '../../domain/evidence/evidence_sync_status.dart';
 import '../../domain/incident/incident.dart';
 import '../../domain/incident/incident_aggregate.dart';
 import '../../domain/timeline/timeline_anchor.dart';
+import '../../domain/incident/incident_composition.dart';
 import '../../engines/investigation_health_engine.dart';
 import '../../repositories/firebase/firebase_evidence_repository.dart';
 import '../../repositories/firebase/firebase_incident_repository.dart';
@@ -61,6 +62,23 @@ class IncidentCloudSyncService {
   }
 
   String? get _userId => UserSessionService.account?.userId;
+
+  int _persistEpoch = 0;
+  bool _persistSuppressed = false;
+
+  /// Blocks write-through so Clear Vault / account delete cannot be undone by
+  /// an in-flight persist of the old aggregate.
+  void beginDestructiveWipe() {
+    _persistSuppressed = true;
+    _persistEpoch++;
+  }
+
+  void endDestructiveWipe() {
+    _persistSuppressed = false;
+  }
+
+  bool _persistAborted(int epoch) =>
+      _persistSuppressed || epoch != _persistEpoch;
 
   /// Hydrates an [IncidentAggregate] from Firestore for the signed-in user's
   /// active incident.
@@ -194,18 +212,23 @@ class IncidentCloudSyncService {
   /// Persists incident counters, every evidence document, and the full
   /// investigation graph (async, non-blocking).
   Future<void> persistAggregate(IncidentAggregate aggregate) async {
-    if (!_enabled) {
+    if (!_enabled || _persistSuppressed) {
       return;
     }
+    final epoch = _persistEpoch;
     final userId = _userId;
     if (userId == null || userId.isEmpty) {
       return;
     }
 
     try {
+      if (_persistAborted(epoch)) {
+        return;
+      }
       final store = aggregate.store;
       final health =
           InvestigationHealthEngine.evaluate(aggregate).overallScore;
+      final composition = IncidentComposition.fromStore(store);
 
       await _incidents.upsertIncident(
         userId: userId,
@@ -214,9 +237,13 @@ class IncidentCloudSyncService {
         relationshipCount: store.relationshipGroups.length,
         narrativeCount: store.narrativeEvents.length,
         reconstructionHealth: health,
-        evidenceCount: store.capturedEvidence.length +
-            store.supportingEvidence.length,
+        evidenceCount: composition.evidenceCount,
+        contextEnrichedCount: composition.contextEnrichedCount,
+        journeyStage: aggregate.sharedIncident.journeyStage.name,
       );
+      if (_persistAborted(epoch)) {
+        return;
+      }
 
       final ordered = _timelineOrderedIds(store);
       final supportingByParent = <String, List<String>>{};
@@ -241,6 +268,9 @@ class IncidentCloudSyncService {
                   store.capturedEvidence[capturedIndex].storagePath != null,
             ),
           );
+          if (_persistAborted(epoch)) {
+            return;
+          }
           store.capturedEvidence[capturedIndex] = withSync;
           await _evidence.upsertCaptured(
             userId: userId,
@@ -264,6 +294,9 @@ class IncidentCloudSyncService {
                       null,
             ),
           );
+          if (_persistAborted(epoch)) {
+            return;
+          }
           store.supportingEvidence[supportingIndex] = withSync;
           await _evidence.upsertSupporting(
             userId: userId,
@@ -274,6 +307,9 @@ class IncidentCloudSyncService {
         }
       }
 
+      if (_persistAborted(epoch)) {
+        return;
+      }
       await _investigation.persistGraph(userId: userId, store: store);
 
       debugPrint('[Sync] persisted incident=${store.incident.id}');
@@ -287,7 +323,7 @@ class IncidentCloudSyncService {
   ///
   /// Used for rename — must not block capture and must not clobber evidenceCount.
   Future<void> persistIncidentOnly(Incident incident) async {
-    if (!_enabled) {
+    if (!_enabled || _persistSuppressed) {
       return;
     }
     final userId = _userId;

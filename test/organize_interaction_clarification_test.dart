@@ -14,6 +14,7 @@ import 'package:evidence_vault/widgets/workspace/organize_groups_modal.dart';
 import 'package:evidence_vault/widgets/workspace/organize_suggestion_card.dart';
 import 'package:evidence_vault/widgets/workspace/organize_suggestion_rail.dart';
 import 'package:evidence_vault/widgets/workspace/organize_workspace_view.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -258,6 +259,7 @@ void main() {
       find.byKey(OrganizeChronologyCanvas.contextTileKey('note-org')),
     );
     await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
     final gesture = await tester.startGesture(
       tester.getCenter(
         find.byKey(OrganizeChronologyCanvas.contextTileKey('note-org')),
@@ -563,6 +565,7 @@ void main() {
       find.byKey(OrganizeChronologyCanvas.contextTileKey(noteId)),
     );
     await tester.pump();
+    await tester.pump(kDoubleTapTimeout);
     final gesture = await tester.startGesture(
       tester.getCenter(
         find.byKey(OrganizeChronologyCanvas.contextTileKey(noteId)),

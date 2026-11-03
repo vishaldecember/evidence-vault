@@ -411,7 +411,7 @@ class InspectorQuietDivider extends StatelessWidget {
       child: Divider(
         height: 1,
         thickness: 1,
-        color: AppColors.cardHalo.withValues(alpha: 0.38),
+        color: AppColors.onCanvas.withValues(alpha: 0.22),
       ),
     );
   }

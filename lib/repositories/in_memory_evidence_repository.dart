@@ -82,6 +82,7 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     WorkspaceCaptureMode mode, {
     String? participantId,
     String? captureSessionId,
+    bool createTimelineAnchor = true,
   }) {
     final now = _captureTimestamp();
     final type = _capturedTypeForMode(mode);
@@ -123,6 +124,7 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     required String parentCapturedEvidenceId,
     String? participantId,
     String? captureSessionId,
+    bool createTimelineAnchor = true,
   }) {
     final now = _captureTimestamp();
     final type = _supportingTypeForMode(mode);
@@ -148,6 +150,12 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     );
 
     _store.supportingEvidence.insert(0, supporting);
+    if (createTimelineAnchor) {
+      _timelineRepository.createAnchor(
+        capturedEvidenceId: supporting.id,
+        anchoredAt: now,
+      );
+    }
     _touchIncident(now);
     return supporting;
   }
@@ -158,6 +166,7 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     required String text,
     String? participantId,
     String? captureSessionId,
+    bool createTimelineAnchor = false,
   }) {
     final now = _captureTimestamp();
     final supporting = SupportingEvidence(
@@ -177,6 +186,12 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     );
 
     _store.supportingEvidence.insert(0, supporting);
+    if (createTimelineAnchor) {
+      _timelineRepository.createAnchor(
+        capturedEvidenceId: supporting.id,
+        anchoredAt: now,
+      );
+    }
     _touchIncident(now);
     return supporting;
   }
@@ -194,6 +209,7 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     String? fileName,
     String? mimeType,
     String? captureSessionId,
+    bool createTimelineAnchor = true,
   }) {
     final now = _captureTimestamp();
     final type = _supportingTypeForMode(mode);
@@ -225,6 +241,12 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
     );
 
     _store.supportingEvidence.insert(0, supporting);
+    if (createTimelineAnchor) {
+      _timelineRepository.createAnchor(
+        capturedEvidenceId: supporting.id,
+        anchoredAt: now,
+      );
+    }
     _touchIncident(now);
     return supporting;
   }
@@ -1192,3 +1214,5 @@ class InMemoryEvidenceRepository implements EvidenceRepository {
       'Observed the interaction at the entrance.\n'
       'Timestamp aligns with prior evidence.';
 }
+
+

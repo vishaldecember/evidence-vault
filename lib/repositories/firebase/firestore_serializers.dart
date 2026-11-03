@@ -31,6 +31,8 @@ abstract final class FirestoreSerializers {
     required int narrativeCount,
     required int reconstructionHealth,
     int? evidenceCount,
+    int? contextEnrichedCount,
+    String? journeyStage,
   }) {
     return {
       'incidentId': incident.id,
@@ -45,6 +47,9 @@ abstract final class FirestoreSerializers {
       'narrativeCount': narrativeCount,
       'reconstructionHealth': reconstructionHealth,
       'evidenceCount': evidenceCount ?? timelineCount,
+      'contextEnrichedCount': ?contextEnrichedCount,
+      if (journeyStage != null && journeyStage.isNotEmpty)
+        'journeyStage': journeyStage,
       'activeIncident': true,
       'coverEvidenceId': incident.coverEvidenceId,
       'deletedAt': incident.deletedAt?.toIso8601String(),
