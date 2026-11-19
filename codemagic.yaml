@@ -20,7 +20,11 @@ workflows:
       - name: Build iOS IPA without code signing
         script: flutter build ipa --debug --no-codesign
 
+ 
     artifacts:
+      - build/ios/archive/*.xcarchive
       - build/ios/ipa/*.ipa
       - build/ios/iphoneos/**/*.app
       - /tmp/xcodebuild_logs/*.log
+
+     
