@@ -17,10 +17,10 @@ workflows:
       - name: Install CocoaPods dependencies
         script: find . -name "Podfile" -execdir pod install \;
 
-             - name: Build iOS IPA without code signing
-          script: flutter build ipa --debug --no-codesign
+      - name: Build iOS IPA without code signing
+        script: flutter build ipa --debug --no-codesign
 
-      artifacts:
-        - build/ios/ipa/*.ipa
-        - build/ios/iphoneos/**/*.app
-        - /tmp/xcodebuild_logs/*.log
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - build/ios/iphoneos/**/*.app
+      - /tmp/xcodebuild_logs/*.log
