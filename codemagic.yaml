@@ -17,14 +17,20 @@ workflows:
       - name: Install CocoaPods dependencies
         script: find . -name "Podfile" -execdir pod install \;
 
-      - name: Build iOS IPA without code signing
-        script: flutter build ipa --debug --no-codesign
+      - name: Build iOS archive
+        script: flutter build ios --debug --no-codesign
+
+      - name: Package iOS app as IPA
+        script: |
+          mkdir -p build/ios/ipa/Payload
+          cp -R build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          /usr/bin/zip -qry evidence-vault.ipa Payload
 
  
     artifacts:
       - build/ios/archive/*.xcarchive
       - build/ios/ipa/*.ipa
-      - build/ios/iphoneos/**/*.app
       - /tmp/xcodebuild_logs/*.log
 
      
