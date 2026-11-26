@@ -21,11 +21,12 @@ workflows:
         script: flutter build ios --debug --no-codesign
 
       - name: Package iOS app as IPA
-        script: |
-          mkdir -p build/ios/ipa/Payload
-          cp -R build/ios/archive/Runner.xcarchive/Products/Applications/Runner.app build/ios/ipa/Payload/
-          cd build/ios/ipa
-          /usr/bin/zip -qry evidence-vault.ipa Payload
+  script: |
+    set -e
+    mkdir -p build/ios/ipa/Payload
+    cp -R build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+    cd build/ios/ipa
+    /usr/bin/zip -qry evidence-vault.ipa Payload
 
  
     artifacts:
